@@ -53,7 +53,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
             <p className="text-[11px] text-muted-foreground">{priceLabel(offer.price.taxesAndFees)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5 md:pl-12">
+        <div className="flex items-center gap-2.5">
           <Car className="size-5 shrink-0 text-primary/70" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">{CATEGORY_LABEL[offer.category]}</p>
