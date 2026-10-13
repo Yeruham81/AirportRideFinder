@@ -37,7 +37,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           Lowest sample price
         </span>
       )}
-      <div className={cn("grid gap-4 p-4 md:grid-cols-[1.1fr_1.25fr_0.8fr_1.2fr_auto] md:items-center md:gap-4 md:p-5", isLowest && "pt-7 md:pt-6")}>
+      <div className={cn("grid gap-4 p-4 md:grid-cols-[1fr_1.2fr_auto_1.1fr_auto] md:items-center md:gap-4 md:p-5", isLowest && "pt-7 md:pt-6")}>
         {/* Provider + mobile price */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -70,7 +70,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
 
         {/* Cancellation + extras */}
         <div className="text-sm">
-          <p className={cn("flex items-center gap-1.5 whitespace-nowrap font-semibold", tone.cls)}>
+          <p className={cn("flex items-center gap-1.5 font-semibold", tone.cls)}>
             <tone.Icon className="size-4" aria-hidden /> {c.headline}
           </p>
           <p className="text-xs text-muted-foreground">{c.detail}</p>
