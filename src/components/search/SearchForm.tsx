@@ -41,10 +41,12 @@ function Field({ label, error, htmlFor, children, className }: { label: string; 
 const control =
   "h-11 w-full min-w-0 rounded-lg border border-input bg-surface pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/25 aria-[invalid=true]:border-destructive";
 
+const controlTight = control.replace("pl-9 pr-3", "pl-8 pr-1");
+
 function IconWrap({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary [&_svg]:size-4">{icon}</span>
+      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-primary [&_svg]:size-4">{icon}</span>
       {children}
     </div>
   );
@@ -149,17 +151,17 @@ export function SearchForm({
         </Field>
         <Field label="Pickup date" htmlFor={`${id}-date`} error={errors.date}>
           <IconWrap icon={<CalendarDays />}>
-            <input id={`${id}-date`} type="date" className={control} value={v.date} min={minDate} onChange={(e) => set("date", e.target.value)} aria-invalid={!!errors.date} required />
+            <input id={`${id}-date`} type="date" className={controlTight} value={v.date} min={minDate} onChange={(e) => set("date", e.target.value)} aria-invalid={!!errors.date} required />
           </IconWrap>
         </Field>
         <Field label="Pickup time (local)" htmlFor={`${id}-time`} error={errors.time}>
           <IconWrap icon={<Clock />}>
-            <input id={`${id}-time`} type="time" className={control} value={v.time} onChange={(e) => set("time", e.target.value)} aria-invalid={!!errors.time} required />
+            <input id={`${id}-time`} type="time" className={controlTight} value={v.time} onChange={(e) => set("time", e.target.value)} aria-invalid={!!errors.time} required />
           </IconWrap>
         </Field>
         <Field label="Passengers" htmlFor={`${id}-pax`} error={errors.pax}>
           <IconWrap icon={<Users />}>
-            <select id={`${id}-pax`} className={control} value={v.pax} onChange={(e) => set("pax", Number(e.target.value))}>
+            <select id={`${id}-pax`} className={controlTight} value={v.pax} onChange={(e) => set("pax", Number(e.target.value))}>
               {Array.from({ length: MAX_PASSENGERS }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>{n} {n === 1 ? "person" : "people"}</option>
               ))}
@@ -168,7 +170,7 @@ export function SearchForm({
         </Field>
         <Field label="Luggage" htmlFor={`${id}-bags`} error={errors.bags}>
           <IconWrap icon={<Briefcase />}>
-            <select id={`${id}-bags`} className={control} value={v.bags} onChange={(e) => set("bags", Number(e.target.value))}>
+            <select id={`${id}-bags`} className={controlTight} value={v.bags} onChange={(e) => set("bags", Number(e.target.value))}>
               {Array.from({ length: MAX_LUGGAGE + 1 }, (_, i) => i).map((n) => (
                 <option key={n} value={n}>{n} {n === 1 ? "bag" : "bags"}</option>
               ))}
