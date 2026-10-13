@@ -94,7 +94,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
             <button
               type="button"
               onClick={() => onViewDeal(model)}
-              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               View provider offer <ArrowUpRight className="size-4" aria-hidden />
               <span className="sr-only"> from {provider.displayName}</span>
