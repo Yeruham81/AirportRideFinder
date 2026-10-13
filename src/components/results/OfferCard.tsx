@@ -37,7 +37,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           Lowest sample price
         </span>
       )}
-      <div className={cn("grid gap-4 p-4 md:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1.35fr)_auto] md:items-center md:gap-5 md:p-5", isLowest && "pt-7 md:pt-6")}>
+      <div className={cn("grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto] md:items-center md:gap-5 md:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)_auto]", isLowest && "pt-7 md:pt-6")}>
         {/* Provider + vehicle (+ mobile price) */}
         <div className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
@@ -57,12 +57,13 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           <Car className="size-5 shrink-0 text-primary/70" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">{CATEGORY_LABEL[offer.category]}</p>
-            <p className="truncate text-xs text-muted-foreground">Listed as “{offer.providerVehicleLabel}”</p>
+            <p className="text-xs text-muted-foreground">Listed as “{offer.providerVehicleLabel}”</p>
           </div>
         </div>
         </div>
 
-        {/* Capacity */}
+        {/* Capacity + cancellation: stacked on medium widths, side by side on wide screens */}
+        <div className="flex min-w-0 flex-col gap-3 xl:grid xl:grid-cols-[auto_minmax(0,1fr)] xl:items-center xl:gap-6">
         <ul className="grid grid-cols-2 gap-1 text-sm text-foreground md:grid-cols-1">
           <li className="flex items-center gap-2"><Users className="size-4 text-muted-foreground" aria-hidden /><span className="whitespace-nowrap">Up to {offer.maxPassengers} people</span></li>
           <li className="flex items-center gap-2"><Briefcase className="size-4 text-muted-foreground" aria-hidden /><span className="whitespace-nowrap">Up to {offer.maxLuggage} bags</span></li>
@@ -80,6 +81,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
               {offer.waitingTimeMins !== null && <span className="inline-flex items-center gap-1"><Clock className="size-3.5" aria-hidden />{offer.waitingTimeMins} min free waiting</span>}
             </p>
           )}
+        </div>
         </div>
 
         {/* Price + action */}
