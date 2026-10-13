@@ -1,14 +1,4 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Phase 1 demonstration prototype (fictional providers, sample prices).
+# Not for indexing until a production launch is approved.
 User-agent: *
-Allow: /
+Disallow: /
