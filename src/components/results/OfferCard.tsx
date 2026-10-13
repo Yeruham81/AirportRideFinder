@@ -37,7 +37,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           Lowest sample price
         </span>
       )}
-      <div className={cn("grid gap-4 p-4 md:grid-cols-[1.25fr_1.3fr_1fr_1.25fr_auto] md:items-center md:gap-5 md:p-5", isLowest && "pt-7 md:pt-6")}>
+      <div className={cn("grid gap-4 p-4 md:grid-cols-[1.1fr_1.25fr_0.8fr_1.2fr_auto] md:items-center md:gap-4 md:p-5", isLowest && "pt-7 md:pt-6")}>
         {/* Provider + mobile price */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -64,13 +64,13 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
 
         {/* Capacity */}
         <ul className="grid grid-cols-2 gap-1 text-sm text-foreground md:grid-cols-1">
-          <li className="flex items-center gap-2"><Users className="size-4 text-muted-foreground" aria-hidden />Up to {offer.maxPassengers} passengers</li>
-          <li className="flex items-center gap-2"><Briefcase className="size-4 text-muted-foreground" aria-hidden />Up to {offer.maxLuggage} bags</li>
+          <li className="flex items-center gap-2"><Users className="size-4 text-muted-foreground" aria-hidden /><span className="whitespace-nowrap">Up to {offer.maxPassengers} people</span></li>
+          <li className="flex items-center gap-2"><Briefcase className="size-4 text-muted-foreground" aria-hidden /><span className="whitespace-nowrap">Up to {offer.maxLuggage} bags</span></li>
         </ul>
 
         {/* Cancellation + extras */}
         <div className="text-sm">
-          <p className={cn("flex items-center gap-1.5 font-semibold", tone.cls)}>
+          <p className={cn("flex items-center gap-1.5 whitespace-nowrap font-semibold", tone.cls)}>
             <tone.Icon className="size-4" aria-hidden /> {c.headline}
           </p>
           <p className="text-xs text-muted-foreground">{c.detail}</p>
@@ -83,7 +83,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
         </div>
 
         {/* Price + action */}
-        <div className="flex flex-col gap-2 md:min-w-[200px] md:flex-row md:items-center md:gap-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
           <div className="hidden text-right md:block">
             <p className="font-display text-[28px] font-extrabold leading-none text-foreground">{price}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">Sample total</p>
@@ -99,7 +99,7 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
               View provider offer <ArrowUpRight className="size-4" aria-hidden />
               <span className="sr-only"> from {provider.displayName}</span>
             </button>
-            <span className="text-center text-[11px] text-muted-foreground">{COPY.bookingElsewhere}</span>
+            <span className="text-center text-[11px] text-muted-foreground md:whitespace-nowrap">{COPY.bookingElsewhere}</span>
           </div>
         </div>
       </div>

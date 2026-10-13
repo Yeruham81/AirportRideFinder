@@ -128,7 +128,7 @@ export function SearchForm({
         noValidate
         aria-label="Search airport transfers"
         className={cn(
-          "grid grid-cols-2 gap-3 md:grid-cols-[1.6fr_1.6fr_1fr_0.8fr_0.75fr_0.75fr_auto] md:items-start",
+          "grid grid-cols-2 gap-3 md:grid-cols-[1.5fr_1.4fr_1.1fr_0.85fr_0.9fr_0.85fr_auto] md:items-start",
           variant === "compact" && !open && "hidden md:grid",
           variant === "compact" && open && "mt-3 md:mt-0",
         )}
@@ -161,7 +161,7 @@ export function SearchForm({
           <IconWrap icon={<Users />}>
             <select id={`${id}-pax`} className={control} value={v.pax} onChange={(e) => set("pax", Number(e.target.value))}>
               {Array.from({ length: MAX_PASSENGERS }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>{n} {n === 1 ? "passenger" : "passengers"}</option>
+                <option key={n} value={n}>{n} {n === 1 ? "person" : "people"}</option>
               ))}
             </select>
           </IconWrap>

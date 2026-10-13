@@ -6,7 +6,7 @@ export const COPY = {
   demoFictional:
     "SkyShuttle, AeroRide, TransferNest and BlueTerminal are fictional provider names. Prices, vehicle capacities and terms are sample data.",
   samplePriceNote: "Sample prices for this route — not checked for your selected date and time.",
-  bookingElsewhere: "Booking completed on provider's site",
+  bookingElsewhere: "Book on provider's site",
   heroEyebrow: "Independent transfer comparison",
   heroTitle: "Compare Airport Transfer Prices Worldwide",
   heroSubtitle:

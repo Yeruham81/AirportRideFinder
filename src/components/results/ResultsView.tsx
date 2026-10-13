@@ -40,8 +40,8 @@ export function ResultsView({ vm, handlers }: { vm: ComparisonViewModel; handler
         onChange={(e) => handlers.onSort(e.target.value as SortOrder)}
         className="h-11 appearance-none rounded-lg border border-input bg-surface pl-3 pr-9 text-sm text-foreground outline-none focus:border-primary"
       >
-        <option value="price_asc">Sort: Price (lowest first)</option>
-        <option value="price_desc">Sort: Price (highest first)</option>
+        <option value="price_asc">Price: lowest first</option>
+        <option value="price_desc">Price: highest first</option>
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
     </div>
@@ -73,7 +73,7 @@ export function ResultsView({ vm, handlers }: { vm: ComparisonViewModel; handler
 
       {!vm.empty && <AtAGlanceStrip vm={vm} />}
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
         <aside className="hidden lg:block" aria-label="Refine your comparison">
           <div className="sticky top-24 rounded-xl border bg-card p-5 shadow-card">
             <h2 className="mb-4 font-display text-lg font-bold">Refine your comparison</h2>
@@ -82,7 +82,7 @@ export function ResultsView({ vm, handlers }: { vm: ComparisonViewModel; handler
         </aside>
 
         <section aria-labelledby="offers-heading" className="min-w-0 space-y-3">
-          <div className="sticky top-16 z-20 -mx-4 flex items-center justify-between gap-3 border-b bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-lg sm:border-0 sm:px-0 lg:static lg:bg-transparent lg:py-0">
+          <div className="sticky top-16 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-lg sm:border-0 sm:px-0 lg:static lg:bg-transparent lg:py-0">
             <h2 id="offers-heading" className="font-display text-base font-bold sm:text-lg" data-testid="offers-count">
               {plural(vm.primaryCount, "comparable provider offer", "comparable provider offers")}
             </h2>
