@@ -22,7 +22,7 @@ export function defaultFormValues(now = new Date()): SearchFormValues {
 const airports = LOCATIONS.filter((l) => l.type === "airport");
 const places = LOCATIONS.filter((l) => l.type !== "airport");
 
-function Field({ label, error, htmlFor, children, className }: { label: string; error?: string; htmlFor: string; children: ReactNode; className?: string }) {
+function Field({ label, error, htmlFor, children, className }: { label: string; error?: string | undefined; htmlFor: string; children: ReactNode; className?: string }) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className="text-xs font-semibold text-foreground">
@@ -74,7 +74,7 @@ export function SearchForm({
 }: {
   initial: SearchFormValues;
   variant?: "hero" | "compact";
-  initialErrors?: FieldErrors;
+  initialErrors?: FieldErrors | undefined;
 }) {
   const navigate = useNavigate();
   const id = useId();

@@ -9,16 +9,16 @@ const int = z.coerce.number().int();
 
 /** Loose URL schema: unknown/invalid values are dropped, then validated below. */
 export interface SearchParams {
-  from?: string;
-  to?: string;
-  date?: string;
-  time?: string;
-  pax?: number;
-  bags?: number;
-  cat?: string;
-  cxl?: string;
-  sort?: string;
-  demoFail?: string;
+  from?: string | undefined;
+  to?: string | undefined;
+  date?: string | undefined;
+  time?: string | undefined;
+  pax?: number | undefined;
+  bags?: number | undefined;
+  cat?: string | undefined;
+  cxl?: string | undefined;
+  sort?: string | undefined;
+  demoFail?: string | undefined;
 }
 
 const STRING_KEYS = ["from", "to", "date", "time", "cat", "cxl", "sort", "demoFail"] as const;

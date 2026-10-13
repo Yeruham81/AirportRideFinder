@@ -9,9 +9,9 @@ export type SimulatedOutcome = "error" | "timeout";
 
 export interface MockAdapterOptions {
   /** Artificial latency in ms (0 in tests / SSR). */
-  delayMs?: number;
+  delayMs?: number | undefined;
   /** Demo-only failure simulation. */
-  simulate?: SimulatedOutcome;
+  simulate?: SimulatedOutcome | undefined;
 }
 
 const wait = (ms: number, signal?: AbortSignal) =>

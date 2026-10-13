@@ -4,8 +4,8 @@ import type { ProviderAdapter } from "./adapter";
 import { createMockAdapter, type SimulatedOutcome } from "./mock/mock-adapter";
 
 export interface RegistryOptions {
-  delayMs?: number;
-  simulate?: Record<string, SimulatedOutcome>;
+  delayMs?: number | undefined;
+  simulate?: Record<string, SimulatedOutcome> | undefined;
 }
 
 /**

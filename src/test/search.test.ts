@@ -54,9 +54,11 @@ describe("LHR demo scenario", () => {
   });
   it("filters by free cancellation and by category", async () => {
     const free = await vmFor("lhr", "central-london", { cancellation: "free" });
+    const freeAll = await vmFor("lhr", "central-london", { cancellation: "free", category: "all" });
     expect(cardPrices(free)).toEqual([4200, 4700, 5100]);
-    expect(free.cancellationOptions.find((o) => o.value === "free")!.count).toBe(
-      free.eligibleCount - free.sections.flatMap((s) => s.offers).filter((c) => c.offer.cancellation.kind !== "free_until").length,
+    expect(free.cancellationOptions.find((o) => o.value === "free")!.count).toBe(freeAll.primaryCount);
+    expect(0).toBe(
+      freeAll.sections.flatMap((s) => s.offers).filter((c) => c.offer.cancellation.kind !== "free_until").length,
     );
     const mini = await vmFor("lhr", "central-london", { category: "minivan" });
     expect(mini.sections.every((s) => s.category === "minivan")).toBe(true);
