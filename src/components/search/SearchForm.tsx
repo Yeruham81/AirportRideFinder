@@ -128,7 +128,7 @@ export function SearchForm({
         noValidate
         aria-label="Search airport transfers"
         className={cn(
-          "grid grid-cols-2 gap-3 md:grid-cols-4 md:items-start xl:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_150px_128px_132px_112px_auto] xl:gap-2.5",
+          "grid grid-cols-2 gap-3 md:grid-cols-4 md:items-start xl:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_146px_126px_120px_106px_auto] xl:gap-2.5",
           variant === "compact" && !open && "hidden md:grid",
           variant === "compact" && open && "mt-3 md:mt-0",
         )}
