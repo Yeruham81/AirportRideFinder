@@ -1,4 +1,4 @@
-# AirportRideFinder — Implementation Plan (Phase 0 → Phase 1), Revision 2
+# AirportRideFinder — Implementation Plan (Phase 0 → Phase 1), Revision 3 (approved scope + final clarifications)
 
 ## A. Product understanding
 AirportRideFinder is an independent metasearch and affiliate referral site for airport transfers. Travelers search one route, compare offers from several independent providers side by side, then continue to the provider's own site to book and pay. We never take bookings, process payments or act as an operator.
@@ -15,12 +15,13 @@ The vehicle class gives context, but this is not a vehicle-picker.
 ## B. Mockup review
 - The desktop mockup is the main visual reference. The mobile version follows the written rules in the brief.
 - Things we keep: a light header with logo and tagline, an airport photo behind a large headline, a search bar in one row, an "at a glance" strip with the four providers, a filter sidebar, horizontal offer cards, and a disclaimer bar.
-- Search form and results form one experience. On `/search`, the full mockup layout is repeated: the photo with the search form already filled in, then the comparison below it. The home page shows the photo and the search form.
+- Homepage: the full airport-photo hero with the prominent search form, as in the mockup.
+- `/search`: a compact search header (one-row editable form, no large hero) so the comparison sits high on the page and stays the main focus. The search can be changed in place without returning home. On mobile the compact form collapses to a summary with an "Edit search" toggle.
 - Corrections to the mockup, based on the brief:
   - The fixed date becomes a date picker that starts on a future date worked out each day. Past dates cannot be picked.
   - Navigation shows only "Compare Transfers", which goes to Home. "How It Works", "Popular Routes" and "About" are left out until those pages exist.
   - "Lowest demo price" is renamed "Lowest sample price". There is no "Best Value" score.
-  - The currency switcher shows "USD (sample prices)" and does not pretend to convert.
+  - There is no currency selector in Phase 1. Each demo route has one predefined sample currency (LHR and JFK in USD, CDG in EUR). The header, summary, strip and cards all show that route's currency, e.g. "Prices in EUR (sample)". A mismatch is never possible.
   - Cards show whether taxes and fees are included, and say "Booking completed on provider's site".
 - Hero image: one temporary visual (a licensed stock photo or a single AI image), kept light. The effort goes into the comparison features, not decoration.
 
@@ -71,7 +72,7 @@ src/
   - Mock offers use `{ kind: "sample" }`. They have no retrieved-at time, no expiry time and are not actionable.
   - Live quotes will use `{ kind: "live", retrievedAt, expiresAt | null, revalidation? }`.
   - The interface reads this field to decide which wording to show.
-- **ProviderSearchResult**: providerId, status (ok | empty | error | timeout), offers[] (a provider can return several), error? (no sensitive details), partial flag.
+- **ProviderSearchResult**: providerId, status (ok | no_offers | error | timeout), offers[] (a provider can return several), error? (no sensitive details). `no_offers` is a successful reply and does not count as a failure. Only `error` and `timeout` make the overall search "partial".
 - Missing data is stored as null and shown as "not available". It is never filled with a guess.
 
 ## F. Mock data strategy (demonstration only)
@@ -98,7 +99,11 @@ src/
 4. **Sort:** price, low to high or high to low, within each currency. The "Lowest sample price" label only compares offers in the same class and currency.
 5. **One source of truth:** a single view model feeds the at-a-glance strip, the offer cards, the counts and the summary, so prices and filter states cannot disagree.
    - The strip shows the cheapest matching offer per provider in the currently shown class.
-   - A provider with no matching offer appears as "No comparable offer".
+   - A provider that replied with no matching offer appears as "No comparable offer for this route". This is neutral wording, not a warning.
+6. **Provider status messaging:**
+   - When a provider fails or times out, a warning reads "Results may be incomplete: AeroRide did not respond". That provider's card shows "Unavailable".
+   - When everyone replies but some have no offers, there is no warning, only the neutral note.
+   - The search is never described as covering all providers when one has failed.
 
 ## H. UI component plan
 - **Building blocks:** the existing shadcn components and semantic color tokens (navy, blue, teal, green, gray).
@@ -141,6 +146,8 @@ Automated tests will check that:
 - The class and cancellation filters work, and the counts match what is shown.
 - Offers that do not fit the passengers or luggage are excluded, and the excluded count is right.
 - The empty route, filters that remove everything, a provider with no offers, and a simulated provider failure each show the right message.
+- A provider with `no_offers` is never shown as a failure or as partial results. A provider with `error` or `timeout` always is.
+- The displayed currency always matches the route's sample offers (CDG shows EUR everywhere).
 - The strip, cards, summary and "Lowest sample price" label show the same prices and terms, because they come from one view model.
 - Every mock offer is marked "sample", has no timestamps, and is shown with sample wording. The words "live", "available" and "valid until" never appear for mock data.
 - Money formatting handles 0, 2 and 3 decimal places correctly.
@@ -180,4 +187,6 @@ Confirmation by checking the code: no databases, payments or outside APIs are wi
 6. The mobile layout, page metadata, robots.txt and sitemap.
 7. The Playwright check on desktop and mobile.
 
-Not included: About and How It Works pages, outside APIs, a database or backend, accounts, payments, analytics and publishing.
+8. A short implementation report covering: what was built, what was tested, failed or incomplete tests, deviations from the plan, the main files and modules, and open issues before Phase 2.
+
+Not included: About and How It Works pages, outside APIs, a database or backend, accounts, payments, analytics and publishing. Phase 2 does not start without your approval.
