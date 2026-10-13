@@ -14,7 +14,7 @@ export interface ComparisonState {
 
 export const DEFAULT_STATE: ComparisonState = { category: "auto", cancellation: "all", sort: "price_asc" };
 
-export function parseComparisonState(p: { cat?: string; cxl?: string; sort?: string }): ComparisonState {
+export function parseComparisonState(p: { cat?: string | undefined; cxl?: string | undefined; sort?: string | undefined }): ComparisonState {
   const category: CategoryFilter =
     p.cat === "all" || (CATEGORY_ORDER as string[]).includes(p.cat ?? "")
       ? (p.cat as CategoryFilter)

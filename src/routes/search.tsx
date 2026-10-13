@@ -5,7 +5,7 @@ import { ResultsSkeleton, ResultsView } from "@/components/results/ResultsView";
 import { defaultFormValues, SearchForm, type SearchFormValues } from "@/components/search/SearchForm";
 import { DEFAULT_STATE, parseComparisonState } from "@/search/compare";
 import { searchTransfers } from "@/search/orchestrator";
-import { buildRequest, parseDemoFail, parseSearchParams, type SearchParams } from "@/search/validation";
+import { buildRequest, parseDemoFail, parseSearchParams, type FieldErrors, type SearchParams } from "@/search/validation";
 import { buildViewModel } from "@/search/view-model";
 
 export const Route = createFileRoute("/search")({
@@ -57,7 +57,7 @@ function formValuesFrom(s: SearchParams): SearchFormValues {
   };
 }
 
-function CompactHeader({ search, errors }: { search: SearchParams; errors?: Record<string, string> }) {
+function CompactHeader({ search, errors }: { search: SearchParams; errors?: FieldErrors | undefined }) {
   const key = [search.from, search.to, search.date, search.time, search.pax, search.bags].join("|");
   return (
     <div className="border-b bg-secondary/60">
