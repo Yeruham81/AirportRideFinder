@@ -11,7 +11,7 @@ import { AtAGlanceStrip } from "./AtAGlanceStrip";
 import { FilterPanel } from "./FilterPanel";
 import { plural } from "./format";
 import { OfferCard } from "./OfferCard";
-import { EmptyState, ProviderStatusNotice } from "./StatusNotices";
+import { CapacityFootnote, EmptyState, ProviderStatusNotice } from "./StatusNotices";
 
 export interface ResultsHandlers {
   onCategory: (c: CategoryFilter) => void;
@@ -144,6 +144,7 @@ export function ResultsView({ vm, handlers }: { vm: ComparisonViewModel; handler
                   )}
                 </div>
               )}
+              <CapacityFootnote vm={vm} />
             </>
           )}
         </section>

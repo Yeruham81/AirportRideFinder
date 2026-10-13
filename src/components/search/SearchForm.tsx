@@ -41,10 +41,12 @@ function Field({ label, error, htmlFor, children, className }: { label: string; 
 const control =
   "h-11 w-full min-w-0 rounded-lg border border-input bg-surface pl-9 pr-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/25 aria-[invalid=true]:border-destructive";
 
+const controlTight = control.replace("pl-9 pr-3", "pl-8 pr-1");
+
 function IconWrap({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary [&_svg]:size-4">{icon}</span>
+      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-primary [&_svg]:size-4">{icon}</span>
       {children}
     </div>
   );
@@ -128,19 +130,19 @@ export function SearchForm({
         noValidate
         aria-label="Search airport transfers"
         className={cn(
-          "grid grid-cols-2 gap-3 md:grid-cols-[1.5fr_1.4fr_1.1fr_0.85fr_0.9fr_0.85fr_auto] md:items-start",
+          "grid grid-cols-2 gap-3 md:grid-cols-4 md:items-start xl:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_140px_130px_124px_108px_auto] xl:gap-2.5",
           variant === "compact" && !open && "hidden md:grid",
           variant === "compact" && open && "mt-3 md:mt-0",
         )}
       >
-        <Field label="Pickup location" htmlFor={`${id}-from`} error={errors.from} className="col-span-2 md:col-span-1">
+        <Field label="Pickup location" htmlFor={`${id}-from`} error={errors.from} className="col-span-2 xl:col-span-1">
           <IconWrap icon={<Plane className="-rotate-45" />}>
             <select id={`${id}-from`} className={control} value={v.from} onChange={(e) => set("from", e.target.value)} aria-invalid={!!errors.from}>
               <LocationOptions />
             </select>
           </IconWrap>
         </Field>
-        <Field label="Drop-off destination" htmlFor={`${id}-to`} error={errors.to} className="col-span-2 md:col-span-1">
+        <Field label="Drop-off destination" htmlFor={`${id}-to`} error={errors.to} className="col-span-2 xl:col-span-1">
           <IconWrap icon={<MapPin />}>
             <select id={`${id}-to`} className={control} value={v.to} onChange={(e) => set("to", e.target.value)} aria-invalid={!!errors.to}>
               <LocationOptions />
@@ -149,17 +151,17 @@ export function SearchForm({
         </Field>
         <Field label="Pickup date" htmlFor={`${id}-date`} error={errors.date}>
           <IconWrap icon={<CalendarDays />}>
-            <input id={`${id}-date`} type="date" className={control} value={v.date} min={minDate} onChange={(e) => set("date", e.target.value)} aria-invalid={!!errors.date} required />
+            <input id={`${id}-date`} type="date" className={controlTight} value={v.date} min={minDate} onChange={(e) => set("date", e.target.value)} aria-invalid={!!errors.date} required />
           </IconWrap>
         </Field>
         <Field label="Pickup time (local)" htmlFor={`${id}-time`} error={errors.time}>
           <IconWrap icon={<Clock />}>
-            <input id={`${id}-time`} type="time" className={control} value={v.time} onChange={(e) => set("time", e.target.value)} aria-invalid={!!errors.time} required />
+            <input id={`${id}-time`} type="time" className={controlTight} value={v.time} onChange={(e) => set("time", e.target.value)} aria-invalid={!!errors.time} required />
           </IconWrap>
         </Field>
         <Field label="Passengers" htmlFor={`${id}-pax`} error={errors.pax}>
           <IconWrap icon={<Users />}>
-            <select id={`${id}-pax`} className={control} value={v.pax} onChange={(e) => set("pax", Number(e.target.value))}>
+            <select id={`${id}-pax`} className={controlTight} value={v.pax} onChange={(e) => set("pax", Number(e.target.value))}>
               {Array.from({ length: MAX_PASSENGERS }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>{n} {n === 1 ? "person" : "people"}</option>
               ))}
@@ -168,21 +170,21 @@ export function SearchForm({
         </Field>
         <Field label="Luggage" htmlFor={`${id}-bags`} error={errors.bags}>
           <IconWrap icon={<Briefcase />}>
-            <select id={`${id}-bags`} className={control} value={v.bags} onChange={(e) => set("bags", Number(e.target.value))}>
+            <select id={`${id}-bags`} className={controlTight} value={v.bags} onChange={(e) => set("bags", Number(e.target.value))}>
               {Array.from({ length: MAX_LUGGAGE + 1 }, (_, i) => i).map((n) => (
                 <option key={n} value={n}>{n} {n === 1 ? "bag" : "bags"}</option>
               ))}
             </select>
           </IconWrap>
         </Field>
-        <div className="col-span-2 flex flex-col gap-1.5 md:col-span-1">
-          <span className="hidden text-xs font-semibold md:block" aria-hidden>&nbsp;</span>
+        <div className="col-span-2 flex flex-col gap-1.5 md:col-span-4 md:items-end xl:col-span-1 xl:items-stretch">
+          <span className="hidden text-xs font-semibold xl:block" aria-hidden>&nbsp;</span>
           <button
             type="submit"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-card transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-5 md:w-auto md:min-w-48 xl:w-full xl:min-w-0 text-sm font-semibold text-primary-foreground shadow-card transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Search className="size-4" aria-hidden />
-            {variant === "compact" ? "Update search" : "Search Transfers"}
+            {variant === "compact" ? (<><span className="xl:hidden">Update search</span><span className="hidden xl:inline">Search</span></>) : "Search Transfers"}
           </button>
         </div>
       </form>

@@ -25,13 +25,19 @@ export function ProviderStatusNotice({ vm }: { vm: ComparisonViewModel }) {
           {vm.respondedWithoutOffers.map((p) => p.displayName).join(", ")} responded with no offers for this route.
         </p>
       )}
-      {vm.hiddenForCapacity > 0 && (
-        <p data-testid="capacity-note" className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Info className="size-3.5 shrink-0" aria-hidden />
-          {plural(vm.hiddenForCapacity, "offer", "offers")} hidden: not enough room for {plural(vm.request.passengers, "passenger", "passengers")} and {plural(vm.request.luggage, "bag", "bags")}.
-        </p>
-      )}
     </div>
+  );
+}
+
+/** Low-key footnote shown below the list when suitable offers exist. */
+export function CapacityFootnote({ vm }: { vm: ComparisonViewModel }) {
+  if (vm.hiddenForCapacity === 0 || vm.empty) return null;
+  return (
+    <p data-testid="capacity-note" className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+      <Info className="size-3.5 shrink-0" aria-hidden />
+      {plural(vm.hiddenForCapacity, "offer was", "offers were")} not shown because the vehicle is too small for{" "}
+      {plural(vm.request.passengers, "passenger", "passengers")} and {plural(vm.request.luggage, "bag", "bags")}.
+    </p>
   );
 }
 

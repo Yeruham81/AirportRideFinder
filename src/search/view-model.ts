@@ -67,6 +67,8 @@ export interface ComparisonViewModel {
   primaryCount: number;
   alternativeCount: number;
   lowestOfferId: string | null;
+  /** True when the cheapest comparable offer has unconfirmed fees, so no lowest-total claim is made. */
+  lowestWithheldForFees: boolean;
   empty: EmptyReason | null;
 }
 
@@ -110,11 +112,22 @@ export function buildViewModel(response: SearchResponse, state: ComparisonState)
     byCancellation.filter((o) => o.category === focusCategory),
     "price_asc",
   );
+  // A "lowest total" claim is only made when the cheapest offer's mandatory
+  // fees are confirmed as included and it is strictly cheaper than every
+  // other comparable offer in the same currency (fees unknown/excluded ones included).
   const lowest = focusOffers[0] ?? null;
+  const sameCurrency = lowest
+    ? focusOffers.filter((o) => o.price.quotedPrice.currency === lowest.price.quotedPrice.currency)
+    : [];
   const lowestOfferId =
-    lowest && focusOffers.filter((o) => o.price.quotedPrice.currency === lowest.price.quotedPrice.currency).length > 1
+    lowest &&
+    sameCurrency.length > 1 &&
+    lowest.price.taxesAndFees === "included" &&
+    sameCurrency[1]!.price.quotedPrice.minor > lowest.price.quotedPrice.minor
       ? lowest.id
       : null;
+  const lowestWithheldForFees =
+    !!lowest && sameCurrency.length > 1 && lowest.price.taxesAndFees !== "included";
 
   const card = (offer: NormalizedTransferOffer): OfferCardModel => ({
     offer,
@@ -150,7 +163,8 @@ export function buildViewModel(response: SearchResponse, state: ComparisonState)
     {
       value: "auto",
       label: defaultCategory ? `Recommended (${CATEGORY_LABEL[defaultCategory]})` : "Recommended",
-      count: byCancellation.length,
+      // Only the directly comparable offers shown in the primary section.
+      count: byCancellation.filter((o) => o.category === defaultCategory).length,
     },
     ...presentCategories.map((g) => ({ value: g.category as CategoryFilter, label: CATEGORY_LABEL[g.category], count: g.offers.length })),
     { value: "all", label: "All suitable vehicle types", count: byCancellation.length },
@@ -203,6 +217,7 @@ export function buildViewModel(response: SearchResponse, state: ComparisonState)
     primaryCount,
     alternativeCount,
     lowestOfferId,
+    lowestWithheldForFees,
     empty,
   };
 }
