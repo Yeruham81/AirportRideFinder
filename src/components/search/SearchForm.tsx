@@ -128,19 +128,19 @@ export function SearchForm({
         noValidate
         aria-label="Search airport transfers"
         className={cn(
-          "grid grid-cols-2 gap-3 md:grid-cols-[1.5fr_1.4fr_1.1fr_0.85fr_0.9fr_0.85fr_auto] md:items-start",
+          "grid grid-cols-2 gap-3 md:grid-cols-4 md:items-start xl:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(150px,1fr)_minmax(115px,0.7fr)_minmax(125px,0.8fr)_minmax(110px,0.7fr)_auto]",
           variant === "compact" && !open && "hidden md:grid",
           variant === "compact" && open && "mt-3 md:mt-0",
         )}
       >
-        <Field label="Pickup location" htmlFor={`${id}-from`} error={errors.from} className="col-span-2 md:col-span-1">
+        <Field label="Pickup location" htmlFor={`${id}-from`} error={errors.from} className="col-span-2 xl:col-span-1">
           <IconWrap icon={<Plane className="-rotate-45" />}>
             <select id={`${id}-from`} className={control} value={v.from} onChange={(e) => set("from", e.target.value)} aria-invalid={!!errors.from}>
               <LocationOptions />
             </select>
           </IconWrap>
         </Field>
-        <Field label="Drop-off destination" htmlFor={`${id}-to`} error={errors.to} className="col-span-2 md:col-span-1">
+        <Field label="Drop-off destination" htmlFor={`${id}-to`} error={errors.to} className="col-span-2 xl:col-span-1">
           <IconWrap icon={<MapPin />}>
             <select id={`${id}-to`} className={control} value={v.to} onChange={(e) => set("to", e.target.value)} aria-invalid={!!errors.to}>
               <LocationOptions />
@@ -175,11 +175,11 @@ export function SearchForm({
             </select>
           </IconWrap>
         </Field>
-        <div className="col-span-2 flex flex-col gap-1.5 md:col-span-1">
-          <span className="hidden text-xs font-semibold md:block" aria-hidden>&nbsp;</span>
+        <div className="col-span-2 flex flex-col gap-1.5 md:col-span-4 md:items-end xl:col-span-1 xl:items-stretch">
+          <span className="hidden text-xs font-semibold xl:block" aria-hidden>&nbsp;</span>
           <button
             type="submit"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-card transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-5 md:w-auto md:min-w-48 xl:w-full xl:min-w-0 text-sm font-semibold text-primary-foreground shadow-card transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Search className="size-4" aria-hidden />
             {variant === "compact" ? "Update search" : "Search Transfers"}

@@ -4,6 +4,7 @@ import { CATEGORY_LABEL } from "@/domain/vehicle-taxonomy";
 import { cn } from "@/lib/utils";
 import type { ComparisonViewModel } from "@/search/view-model";
 import { providerTextClass } from "./ProviderMark";
+import { shortFeeLabel } from "./format";
 
 export function AtAGlanceStrip({ vm }: { vm: ComparisonViewModel }) {
   if (!vm.focusCategory) return null;
@@ -37,6 +38,17 @@ export function AtAGlanceStrip({ vm }: { vm: ComparisonViewModel }) {
                 <span className="text-xs text-muted-foreground">{CATEGORY_LABEL[g.card.offer.category]}</span>
               </p>
             )}
+            {g.kind === "offer" && (
+              <p
+                data-testid="glance-fee"
+                className={cn(
+                  "mt-1 text-[11px] font-medium",
+                  g.card.offer.price.taxesAndFees === "included" ? "text-muted-foreground" : "text-warning-foreground",
+                )}
+              >
+                {shortFeeLabel(g.card.offer.price.taxesAndFees)}
+              </p>
+            )}
             {g.kind === "no_comparable" && (
               <p className="mt-2 text-xs text-muted-foreground">No comparable offer for this route</p>
             )}
@@ -48,6 +60,11 @@ export function AtAGlanceStrip({ vm }: { vm: ComparisonViewModel }) {
           </li>
         ))}
       </ul>
+      {vm.lowestWithheldForFees && (
+        <p data-testid="lowest-withheld" className="mt-2 text-xs text-muted-foreground">
+          No lowest-price label shown: the cheapest sample price does not confirm that taxes and fees are included.
+        </p>
+      )}
     </section>
   );
 }

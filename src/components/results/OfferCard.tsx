@@ -5,7 +5,7 @@ import { CATEGORY_LABEL } from "@/domain/vehicle-taxonomy";
 import { cn } from "@/lib/utils";
 import type { OfferCardModel } from "@/search/view-model";
 import { COPY } from "@/content/strings";
-import { feeLabel } from "./format";
+import { feeLabel, priceLabel } from "./format";
 import { ProviderMark, providerTextClass } from "./ProviderMark";
 
 const TONE: Record<CancellationTone, { cls: string; Icon: typeof Check }> = {
@@ -37,8 +37,9 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           Lowest sample price
         </span>
       )}
-      <div className={cn("grid gap-4 p-4 md:grid-cols-[1fr_1.2fr_auto_1.1fr_auto] md:items-center md:gap-4 md:p-5", isLowest && "pt-7 md:pt-6")}>
-        {/* Provider + mobile price */}
+      <div className={cn("grid gap-4 p-4 md:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1.35fr)_auto] md:items-center md:gap-5 md:p-5", isLowest && "pt-7 md:pt-6")}>
+        {/* Provider + vehicle (+ mobile price) */}
+        <div className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <ProviderMark provider={provider} />
@@ -49,17 +50,16 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
           </div>
           <div className="text-right md:hidden">
             <p className="font-display text-2xl font-extrabold text-foreground">{price}</p>
-            <p className="text-[11px] text-muted-foreground">Sample total</p>
+            <p className="text-[11px] text-muted-foreground">{priceLabel(offer.price.taxesAndFees)}</p>
           </div>
         </div>
-
-        {/* Vehicle */}
-        <div className="flex items-center gap-3">
-          <Car className="size-7 shrink-0 text-primary/70" aria-hidden />
+        <div className="flex items-center gap-2.5 md:pl-12">
+          <Car className="size-5 shrink-0 text-primary/70" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">{CATEGORY_LABEL[offer.category]}</p>
             <p className="truncate text-xs text-muted-foreground">Listed as “{offer.providerVehicleLabel}”</p>
           </div>
+        </div>
         </div>
 
         {/* Capacity */}
@@ -86,10 +86,10 @@ export function OfferCard({ model, onViewDeal }: { model: OfferCardModel; onView
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
           <div className="hidden text-right md:block">
             <p className="font-display text-[28px] font-extrabold leading-none text-foreground">{price}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">Sample total</p>
-            <p className="text-[11px] text-muted-foreground">{feeLabel(offer.price.taxesAndFees)}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{priceLabel(offer.price.taxesAndFees)}</p>
+            <p data-testid="card-fee" className={cn("text-[11px]", offer.price.taxesAndFees === "included" ? "text-muted-foreground" : "font-medium text-warning-foreground")}>{feeLabel(offer.price.taxesAndFees)}</p>
           </div>
-          <p className="text-xs text-muted-foreground md:hidden">{feeLabel(offer.price.taxesAndFees)}</p>
+          <p className={cn("text-xs md:hidden", offer.price.taxesAndFees === "included" ? "text-muted-foreground" : "font-medium text-warning-foreground")}>{feeLabel(offer.price.taxesAndFees)}</p>
           <div className="flex flex-col items-stretch gap-1 md:items-center">
             <button
               type="button"
