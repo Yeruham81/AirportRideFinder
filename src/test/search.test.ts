@@ -97,6 +97,34 @@ describe("LHR demo scenario", () => {
   });
 });
 
+describe("filter counts and fee transparency", () => {
+  it("Recommended counts only the primary comparable offers; All counts every suitable offer", async () => {
+    const vm = await vmFor("lhr", "central-london");
+    const rec = vm.categoryOptions.find((o) => o.value === "auto")!;
+    const all = vm.categoryOptions.find((o) => o.value === "all")!;
+    expect(rec.count).toBe(vm.primaryCount);
+    expect(rec.count).toBe(4);
+    expect(all.count).toBe(vm.primaryCount + vm.alternativeCount);
+    const allVm = await vmFor("lhr", "central-london", { category: "all" });
+    expect(allVm.primaryCount).toBe(all.count);
+    const free = await vmFor("lhr", "central-london", { cancellation: "free" });
+    expect(free.categoryOptions.find((o) => o.value === "auto")!.count).toBe(free.primaryCount);
+  });
+  it("no lowest-total claim when the cheapest offer's fees are not confirmed", async () => {
+    // JFK: AeroRide $72 is cheapest but excludes taxes & fees.
+    const vm = await vmFor("jfk", "manhattan");
+    expect(vm.lowestOfferId).toBeNull();
+    expect(vm.lowestWithheldForFees).toBe(true);
+    expect(vm.glance.some((g) => g.kind === "offer" && g.card.isLowest)).toBe(false);
+  });
+  it("lowest-total claim when the cheapest offer includes fees", async () => {
+    const vm = await vmFor("lhr", "central-london");
+    const lowest = vm.sections.flatMap((s) => s.offers).find((c) => c.isLowest)!;
+    expect(lowest.offer.price.taxesAndFees).toBe("included");
+    expect(vm.lowestWithheldForFees).toBe(false);
+  });
+});
+
 describe("provider status", () => {
   it("a successful empty reply is not a failure", async () => {
     const vm = await vmFor("jfk", "manhattan");

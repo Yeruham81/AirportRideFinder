@@ -6,7 +6,7 @@ import { formatMoney } from "@/domain/money";
 import { CATEGORY_LABEL } from "@/domain/vehicle-taxonomy";
 import { resolveBookingLink, type BookingLinkResolution } from "@/redirect/redirect";
 import type { OfferCardModel } from "@/search/view-model";
-import { feeLabel } from "@/components/results/format";
+import { feeLabel, priceLabel } from "@/components/results/format";
 
 export function ViewDealDialog({ model, onClose }: { model: OfferCardModel | null; onClose: () => void }) {
   const [resolution, setResolution] = useState<BookingLinkResolution | null>(null);
@@ -29,7 +29,7 @@ export function ViewDealDialog({ model, onClose }: { model: OfferCardModel | nul
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border bg-muted p-3 text-sm">
               <dt className="text-muted-foreground">Vehicle</dt>
               <dd className="font-medium">{CATEGORY_LABEL[model.offer.category]}</dd>
-              <dt className="text-muted-foreground">Sample total</dt>
+              <dt className="text-muted-foreground">{priceLabel(model.offer.price.taxesAndFees)}</dt>
               <dd className="font-medium">{formatMoney(model.offer.price.quotedPrice)} <span className="text-xs text-muted-foreground">({feeLabel(model.offer.price.taxesAndFees)})</span></dd>
               <dt className="text-muted-foreground">Cancellation</dt>
               <dd className="font-medium">{describeCancellation(model.offer.cancellation).headline}</dd>
