@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import type { CancellationFilter, CategoryFilter } from "@/search/compare";
 import type { ComparisonViewModel } from "@/search/view-model";
 
@@ -26,12 +26,13 @@ export function FilterPanel({
   onCancellation: (c: CancellationFilter) => void;
   onReset: () => void;
 }) {
+  const uid = useId();
   const isDefault = vm.state.category === "auto" && vm.state.cancellation === "all";
   return (
     <div className="space-y-5">
       <div>
-        <label htmlFor="flt-cat" className="mb-1.5 block text-xs font-semibold text-foreground">Vehicle class</label>
-        <SelectBox id="flt-cat" value={vm.state.category} onChange={(e) => onCategory(e.target.value as CategoryFilter)}>
+        <label htmlFor={`${uid}-cat`} className="mb-1.5 block text-xs font-semibold text-foreground">Vehicle class</label>
+        <SelectBox id={`${uid}-cat`} value={vm.state.category} onChange={(e) => onCategory(e.target.value as CategoryFilter)}>
           {vm.categoryOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label} ({o.count})</option>
           ))}
@@ -39,8 +40,8 @@ export function FilterPanel({
         <p className="mt-1.5 text-xs text-muted-foreground">Offers are matched to a common vehicle class. Each provider's own wording is shown on the card.</p>
       </div>
       <div>
-        <label htmlFor="flt-cxl" className="mb-1.5 block text-xs font-semibold text-foreground">Cancellation policy</label>
-        <SelectBox id="flt-cxl" value={vm.state.cancellation} onChange={(e) => onCancellation(e.target.value as CancellationFilter)}>
+        <label htmlFor={`${uid}-cxl`} className="mb-1.5 block text-xs font-semibold text-foreground">Cancellation policy</label>
+        <SelectBox id={`${uid}-cxl`} value={vm.state.cancellation} onChange={(e) => onCancellation(e.target.value as CancellationFilter)}>
           {vm.cancellationOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label} ({o.count})</option>
           ))}
