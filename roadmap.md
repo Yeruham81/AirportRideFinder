@@ -13,5 +13,9 @@
 - [x] Unit tests + desktop/mobile browser check
 - [x] Implementation report
 
+## Phase 2A — GetTransfer sandbox read-only diagnostics
+- [x] Server-only route_info client, parser, mocked tests, manual script
+- [ ] One authorized sandbox GET — blocked: user must add GETTRANSFER_SANDBOX_TOKEN
+
 ## Later (needs approval)
-- Phase 2+ — not started
+- Phase 2B+ — not started

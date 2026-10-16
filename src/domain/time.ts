@@ -63,3 +63,20 @@ export function formatLocalDate(date: string, locale = "en-GB"): string {
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00Z`));
 }
+
+/**
+ * Local wall-clock datetime at `timeZone` with its UTC offset for that instant,
+ * e.g. "2026-10-23T14:00:00+01:00".
+ */
+export function localDateTimeWithOffset(instant: Date, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+      timeZoneName: "longOffset",
+    }).formatToParts(instant).map((p) => [p.type, p.value]),
+  );
+  const tz = String(parts["timeZoneName"]); // "GMT", "GMT+01:00"
+  const offset = tz === "GMT" ? "+00:00" : tz.replace("GMT", "");
+  return `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}:${parts["second"]}${offset}`;
+}
