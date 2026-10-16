@@ -89,7 +89,11 @@ export function parseFormattedAmount(raw: unknown, currency: string | null): Par
   const markers = [preCode, symbol, postCode].filter(Boolean);
   if (markers.length !== 1) return { raw: s, amount: null };
   const marker = markers[0]!;
-  const ok = marker === currency || (symbol !== undefined && symbol === currencySymbol(currency));
+  // Exact literal aliases only (observed in sandbox output); no broad alias table.
+  const SYMBOL_ALIASES: Record<string, string> = { USD: "US$" };
+  const ok =
+    marker === currency ||
+    (symbol !== undefined && (symbol === currencySymbol(currency) || symbol === SYMBOL_ALIASES[currency]));
   if (!ok) return { raw: s, amount: null };
   try {
     const decimal = intPart!.replace(/,/g, "") + (frac ? `.${frac}` : "");
