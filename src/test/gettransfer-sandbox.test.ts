@@ -104,3 +104,49 @@ describe("GetTransfer sandbox (mocked, never live)", () => {
     expect(f).not.toHaveBeenCalled();
   });
 });
+
+describe("GetTransfer US$ format (mocked)", () => {
+  it("parses US$ amounts for USD and keeps the raw string", () => {
+    expect(parseFormattedAmount("US$48", "USD")).toEqual({ raw: "US$48", amount: { currency: "USD", minor: 4800 } });
+    expect(parseFormattedAmount("US$48.50", "USD")?.amount).toEqual({ currency: "USD", minor: 4850 });
+    expect(parseFormattedAmount("US$1,234.50", "USD")?.amount).toEqual({ currency: "USD", minor: 123450 });
+  });
+
+  it("keeps existing $ and USD forms", () => {
+    expect(parseFormattedAmount("$48", "USD")?.amount).toEqual({ currency: "USD", minor: 4800 });
+    expect(parseFormattedAmount("48 USD", "USD")?.amount).toEqual({ currency: "USD", minor: 4800 });
+    expect(parseFormattedAmount("USD 48", "USD")?.amount).toEqual({ currency: "USD", minor: 4800 });
+  });
+
+  it("rejects US$ for other currencies, bad precision/grouping and mixed markers", () => {
+    for (const [raw, cur] of [
+      ["US$48", "EUR"], ["US$48", "CAD"], ["US$48.505", "USD"], ["US$1,23.50", "USD"],
+      ["US$12,34", "USD"], ["US$48 EUR", "USD"], ["US$48USD", "USD"], ["US$ 48x", "USD"],
+      ["US$-48", "USD"], ["XUS$48", "USD"], ["US$$48", "USD"],
+    ] as const) {
+      expect(parseFormattedAmount(raw, cur)?.amount ?? null).toBeNull();
+    }
+  });
+
+  it("sandbox-shaped fixture: economy book_now US$48 is bookable (diagnostic only)", async () => {
+    const f = json(200, {
+      result: "success",
+      data: {
+        success: true, distance: 27, duration: 50,
+        prices: {
+          economy: { min: "US$19", min_float: 19, book_now: "US$48" },
+          business: { min: "US$24", min_float: 24 },
+        },
+      },
+    });
+    const r = await sandboxRouteInfo(Q, { token: TOKEN, fetchImpl: f });
+    if (r.status !== "ok") throw new Error(r.status);
+    const eco = r.diagnostics.prices.find((p) => p.type === "economy")!;
+    expect(eco.bookNow).toEqual({ raw: "US$48", amount: { currency: "USD", minor: 4800 } });
+    expect(eco.bookable).toBe(true);
+    expect(eco.indicativeMin).toBe("US$19");
+    expect(r.diagnostics.prices.find((p) => p.type === "business")!.bookable).toBe(false);
+    expect(r.diagnostics.unknown).toContain("fees");
+    expect(r.diagnostics.unknown).toContain("booking_url");
+  });
+});
