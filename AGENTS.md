@@ -20,3 +20,4 @@
 - Booking links go through `redirect/resolveBookingLink`; final redirect strategy is undecided per provider.
 - Search inputs live in the URL (`/search`), validated in `search/validation.ts`; pickup time is local time + IANA zone of the pickup location.
 - While the site uses fictional data, every route stays `noindex` and robots.txt disallows all — prototype must not be indexed.
+- GetTransfer sandbox code lives in `providers/gettransfer/` (pure parser + `*.server.ts` client) and is invoked only by `scripts/gettransfer-sandbox-check.ts`; it is not registered in the adapter registry or any route — sandbox diagnostics must never reach public pages or expose the token.
