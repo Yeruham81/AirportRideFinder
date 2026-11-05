@@ -6,6 +6,7 @@ import { formatMoney } from "@/domain/money";
 import { CATEGORY_LABEL } from "@/domain/vehicle-taxonomy";
 import { loadIntuiPreview, unlockIntuiPreview, lockIntuiPreview } from "@/search/intui-preview.functions";
 import { parseSearchParams } from "@/search/validation";
+import { INTUI_PREVIEW_MESSAGES } from "@/search/intui-preview-errors";
 
 export const Route = createFileRoute("/intui-preview")({
   validateSearch: (raw: Record<string, unknown>) => parseSearchParams(raw),
@@ -131,9 +132,21 @@ function IntuiPreview() {
         </div>
       )}
       {result.kind === "error" && (
-        <div role="alert" className="rounded-lg border bg-card p-5 text-sm">
-          No verified Intui transfer prices could be retrieved for this search.
-          Please try a different route or a later date.
+        <div role="alert" className="space-y-3 rounded-lg border bg-card p-5 text-sm">
+          <p className="font-semibold">The Intui search could not be completed.</p>
+          <p>{INTUI_PREVIEW_MESSAGES[result.code]}</p>
+          <p className="text-xs text-muted-foreground">
+            Diagnostic code: <code>{result.code}</code>. This code does not contain API keys,
+            prices, booking links or provider response details.
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void router.invalidate()}
+            className="rounded-lg border border-input px-4 py-2 text-sm font-medium text-primary disabled:opacity-50"
+          >
+            Retry this search
+          </button>
         </div>
       )}
       {result.kind === "no_offers" && (
