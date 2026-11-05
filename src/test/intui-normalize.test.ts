@@ -99,7 +99,7 @@ describe("Intui offer normalization — pure and conservative", () => {
       withInfo({ vehicle_type: "shuttle", perperson: true }),
       withInfo({ perperson: true }),
       withInfo({ productid: null }),
-      withInfo({ productid: "product-23" }),
+      withInfo({ productid: "https://provider.example/offer" }),
       withInfo({ maxpax: "4 passengers" }),
       withInfo({ type_vehicle: "Boat", vehicle_class: "Boat" }),
       withInfo({ type_vehicle: "SUV", vehicle_class: "N/a" }),
