@@ -10,7 +10,7 @@ permissions:
 jobs:
   intui-diagnostic:
     if: >-
-      github.event.label.name == 'intui-diagnostic-once-20261105' &&
+      github.event.label.name == 'enhancement' &&
       github.event.pull_request.number == 1 &&
       github.event.pull_request.head.ref == 'feature/intui-api-safe-2026-11-05' &&
       github.event.pull_request.head.repo.full_name == github.repository
