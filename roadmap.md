@@ -20,7 +20,10 @@
 ## Intui — isolated read-only development
 - [x] Pure GEO request builder and fail-closed response parser; isolated disabled adapter
 - [x] Gated server-only POST client and mocked transport tests (feature branch, pending CI review)
-- [ ] Live requests and UI wiring — disabled. Requires verified allprice/currency response shape, server-only INTUI_API_KEY, explicit INTUI_LIVE_ENABLED=true and confirmed affiliate attribution. No booking/payment integration.
+- [x] One-request shape diagnostic: HTTP 200; 102 candidate entries in `response.<dynamic-key>.travelling`; numeric `pricing.allprice.USD` confirmed (05-Nov-2026)
+- [x] Parser understands nested response, numeric-string capacities and cancellation; synthetic tests added, live provider still disabled
+- [x] Diagnostic workflow disabled following its authorized run; secrets and raw API responses never logged
+- [ ] Live offers and UI wiring — disabled pending confirmation of total-price and fee semantics, booking eligibility, deployment credential, server feature flag and Travelpayouts affiliate attribution. No booking/payment integration.
 
 ## Later (needs approval)
 - Phase 2B+ — not started
