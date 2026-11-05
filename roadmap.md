@@ -15,7 +15,11 @@
 
 ## Phase 2A — GetTransfer sandbox read-only diagnostics
 - [x] Server-only route_info client, parser, mocked tests, manual script
-- [ ] One authorized sandbox GET — blocked: user must add GETTRANSFER_SANDBOX_TOKEN
+- [x] One authorized sandbox GET succeeded 16-Oct-2026: HTTP 200, success true; USD formatting subsequently tested offline
+
+## Intui — isolated read-only development
+- [ ] Pure validated GEO inputs, conservative parser, disabled server-only adapter, mocked tests
+- [ ] Live requests and UI wiring — blocked: verified auth/request and price/currency contract, secure INTUI_API_KEY and explicit activation required; affiliate tracking unconfirmed
 
 ## Later (needs approval)
 - Phase 2B+ — not started
