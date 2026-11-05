@@ -73,6 +73,24 @@ restricted host), a distributed request quota, and private `Cache-Control` for
 all preview RPCs. No booking URLs, raw API payloads, or keys are serialized to
 the browser.
 
+## Diagnosing a failed hosted preview
+
+On a successful password login, the preview can still fail if the hosting
+runtime cannot reach Intui, the provider rejects its key or parameters, a
+request times out, or no quotes pass strict normalization. A single generic
+error message did not distinguish these cases.
+
+The authenticated `/intui-preview` page now displays **only an allowlisted,
+non-sensitive diagnostic code** such as `provider_unreachable`,
+`provider_unauthorized`, `provider_timeout`, `invalid_provider_response`,
+or `no_eligible_offers`, and offers a manual retry. These codes do not
+contain provider response values, credentials, links or client details.
+
+If the error persists, record that diagnostic code and the requested route/
+date/time. Check the code first before modifying API credentials or making
+additional calls. No debugging route or public logging of the API response
+is introduced.
+
 ## Before activation
 
 1. The official Travelpayouts article defines `pricing.allprice` as the total
