@@ -1,0 +1,28 @@
+name: Verify AirportRideFinder
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Unit tests (mocked APIs)
+        run: bunx vitest run
+      - name: Production build (regenerates TanStack route types)
+        run: bun run build
+      - name: Type check
+        run: bunx tsc --noEmit --project tsconfig.json

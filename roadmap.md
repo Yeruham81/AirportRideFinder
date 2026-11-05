@@ -18,8 +18,18 @@
 - [x] One authorized sandbox GET succeeded 16-Oct-2026: HTTP 200, success true; USD formatting subsequently tested offline
 
 ## Intui — isolated read-only development
-- [ ] Pure validated GEO inputs, conservative parser, disabled server-only adapter, mocked tests
-- [ ] Live requests and UI wiring — blocked: verified auth/request and price/currency contract, secure INTUI_API_KEY and explicit activation required; affiliate tracking unconfirmed
+- [x] Pure GEO request builder and fail-closed response parser; isolated disabled adapter
+- [x] Gated server-only POST client and mocked transport tests (feature branch, pending CI review)
+- [x] One-request shape diagnostic: HTTP 200; 102 candidate entries in `response.<dynamic-key>.travelling`; numeric `pricing.allprice.USD` confirmed (05-Nov-2026)
+- [x] Parser understands nested response, numeric-string capacities and cancellation; synthetic tests added, live provider still disabled
+- [x] Temporary diagnostic workflows disabled/removed following authorized runs; secrets and raw API responses were not logged
+- [x] Opt-in server-side private-transfer adapter: verified support for opaque string product IDs, strict price/capacity/category normalization, unknown fee inclusion, disabled booking
+- [x] Controlled integration smoke test 05-Nov-2026: 95/102 Intui entries normalized for LHR → central London, lowest observed quote USD 111.35, non-actionable, fees not guaranteed
+- [x] Separate noindex /intui-preview read-only page and server function, OFF by default until deployment-only INTUI_API_KEY + INTUI_LIVE_ENABLED=true + INTUI_PREVIEW_ENABLED=true
+- [x] Preview login: strong server-side access password, 30-minute HMAC-signed HttpOnly cookie, authenticated handler, and best-effort in-process request throttles
+- [ ] Configure a secured hosting environment with perimeter access control, shared/distributed rate limit and all five server secrets; never assume GitHub Actions secrets are hosting secrets
+- [ ] Perform protected end-to-end browser preview with the real Intui data, before enabling public comparison
+- [ ] Public comparison and redirects — not started. Requires provider tracking/affiliate attribution and safe live-mode UX; no booking/payment integration.
 
 ## Later (needs approval)
 - Phase 2B+ — not started

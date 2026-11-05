@@ -1,55 +1,82 @@
-import type { NormalizedLocation } from "@/domain/types";
+/**
+ * Intui.travel ProviderAdapter — server-side only, disabled unless explicitly
+ * constructed with enabled:true AND INTUI_LIVE_ENABLED=true + INTUI_API_KEY.
+ * Not registered in the site's four-provider demonstration registry.
+ */
+import type { NormalizedLocation, ProviderSearchResult } from "@/domain/types";
 import type { ProviderAdapter } from "@/providers/adapter";
 import { buildIntuiGeoRequest } from "./request";
+import { fetchIntuiGetAvailCar } from "./client.server";
 
 export const INTUI_ENDPOINT = "https://api.intui.travel/ver1_0/GetAvailCar/";
-/** Isolated metadata only; never append to the four-provider demo list. */
-export const INTUI_PROVIDER = { id: "intui", displayName: "Intui.travel", brand: "blue", isFictional: false } as const;
+export const INTUI_PROVIDER = {
+  id: "intui", displayName: "Intui.travel", brand: "blue", isFictional: false,
+} as const;
 
-export type IntuiClientStatus = "missing_secret" | "disabled";
-
-/**
- * Deliberately non-networking client scaffold. No actual credentials are read.
- * TODO: independently verify response allprice shape and resolve official
- * article's GET heading vs POST JSON examples before enabling transport.
- * Verified examples place `apikey` in JSON, NOT a header or query string.
- * Future transport: server-only POST JSON, HTTPS, redirect:error, bounded
- * fetch+body timeout, sanitized 401/403/429/status/network errors, no retries.
- * Read process.env.INTUI_API_KEY only inside that future execution boundary.
- * Both key and INTUI_LIVE_ENABLED='true' will be required, not sufficient.
- * Tracking is unconfirmed; raw intuiUrlOrderSingle must never be actionable.
- */
-export async function intuiGetAvailCar(
-  request: ReturnType<typeof buildIntuiGeoRequest>,
-  options: { fetchImpl?: typeof fetch; secretConfigured?: boolean; liveEnabled?: boolean } = {},
-): Promise<{ status: IntuiClientStatus }> {
-  void request;
-  // Presence only, supplied by a future trusted caller; never accept a key here.
-  if (!options.secretConfigured) return { status: "missing_secret" };
-  return { status: "disabled" };
+export interface IntuiAdapterOptions {
+  /** Dedicated opt-in: disabled by default even if deployment secrets exist. */
+  enabled?: boolean;
+  env?: { INTUI_API_KEY?: string; INTUI_LIVE_ENABLED?: string };
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+  /** Test-only deterministic clock. Production uses actual receipt time. */
+  now?: () => Date;
 }
 
-export function createIntuiAdapter(locations: readonly NormalizedLocation[]): ProviderAdapter {
-  const byId = new Map(locations.map((l) => [l.id, l]));
+export function createIntuiAdapter(
+  locations: readonly NormalizedLocation[],
+  options: IntuiAdapterOptions = {},
+): ProviderAdapter {
+  const byId = new Map(locations.map((location) => [location.id, location]));
   return {
     provider: INTUI_PROVIDER,
     mapLocation: (location) => location.coords ? location.id : null,
-    async search(request) {
+    async search(request, context): Promise<ProviderSearchResult> {
+      const startedAt = Date.now();
+      const failure = (code: string, status: "error" | "timeout" = "error"): ProviderSearchResult => ({
+        providerId: INTUI_PROVIDER.id,
+        status,
+        offers: [],
+        durationMs: Date.now() - startedAt,
+        error: { code, message: "Intui search could not be completed" },
+      });
+      if (!options.enabled) return failure("integration_disabled");
       const pickup = byId.get(request.pickupId);
       const dropoff = byId.get(request.dropoffId);
-      if (!pickup || !dropoff) return {
-        providerId: "intui", status: "error", offers: [], durationMs: 0,
-        error: { code: "invalid_locations", message: "Intui locations are invalid" },
+      if (!pickup || !dropoff) return failure("invalid_locations");
+
+      let query: ReturnType<typeof buildIntuiGeoRequest>;
+      try {
+        query = buildIntuiGeoRequest(request, pickup, dropoff);
+      } catch {
+        return failure("invalid_request");
+      }
+
+      const result = await fetchIntuiGetAvailCar(query, {
+        env: options.env,
+        fetchImpl: options.fetchImpl,
+        timeoutMs: options.timeoutMs,
+        signal: context.signal,
+        normalization: {
+          searchRef: context.searchRef,
+          retrievedAt: (options.now?.() ?? new Date()).toISOString(),
+          passengers: request.passengers,
+          luggage: request.luggage,
+        },
+      });
+      if (result.status === "ok") return {
+        providerId: INTUI_PROVIDER.id,
+        status: "ok",
+        offers: result.offers,
+        durationMs: Date.now() - startedAt,
       };
-      try { buildIntuiGeoRequest(request, pickup, dropoff); }
-      catch { return {
-        providerId: "intui", status: "error", offers: [], durationMs: 0,
-        error: { code: "invalid_request", message: "Intui search inputs are invalid" },
-      }; }
-      return {
-        providerId: "intui", status: "error", offers: [], durationMs: 0,
-        error: { code: "integration_disabled", message: "Intui integration is not activated" },
+      if (result.status === "no_offers") return {
+        providerId: INTUI_PROVIDER.id,
+        status: "no_offers", offers: [],
+        durationMs: Date.now() - startedAt,
       };
+      if (result.status === "timeout") return failure("timeout", "timeout");
+      return failure(result.status);
     },
   };
 }
