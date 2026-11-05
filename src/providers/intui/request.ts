@@ -3,7 +3,7 @@ import type { NormalizedLocation, TransferSearchRequest } from "@/domain/types";
 
 /** Official GEO example uses `geo`; no credentials belong in this pure object. */
 export interface IntuiGeoRequest {
-  coordinatesType: "geo";
+  coordinatesType: "GEO";
   gpsLatR: number;
   gpsLngR: number;
   gpsLatEnd: number;
@@ -43,7 +43,7 @@ export function buildIntuiGeoRequest(
       ["Europe/London", "America/New_York"].includes(pickup.timeZone) ? "USD" : null);
   if (currency !== "USD" && currency !== "EUR") throw new Error("unsupported_currency");
   return {
-    coordinatesType: "geo", gpsLatR: from.lat, gpsLngR: from.lng,
+    coordinatesType: "GEO", gpsLatR: from.lat, gpsLngR: from.lng,
     gpsLatEnd: to.lat, gpsLngEnd: to.lng, adults: request.passengers,
     arrivalDateTime: `${request.localDate}T${request.localTime}:00`,
     currency, lang: "en", multiprice: false,
