@@ -54,6 +54,17 @@ disabled by default and requires an explicit server-side diagnostic flag.
   prices. Counters and empty states update without extra Intui API requests.
   Capacity filters apply only within the original passenger/luggage search.
   `src/search/intui-preview-filters.ts` tests precise minor-unit arithmetic.
+- `src/search/intui-preview-groups.ts` and
+  `src/components/intui/IntuiPreviewCategorySections.tsx`: arrange verified
+  quotes by explicit vehicle category, show the **three initially visible**
+  offers in each category, and allow independent "Show more / Show fewer".
+  Each category has a muted distinct gradient, quick-jump link, offer count and
+  confirmed in-category minimum when the currency is comparable. Cards use
+  restrained labels only for observed cheapest-in-category quoted price,
+  a provider's stated free cancellation, meet-and-greet, and capacity beyond
+  the requested baggage. No guessed ratings, popularity or booking availability.
+  Changing any filter/sort resets sections to collapsed and never calls Intui
+  again. A wide responsive grid reduces vertical scrolling.
 - The global sample-data header badge is omitted on `/intui-preview` only.
   It remains present on the fictional demo pages to avoid confusion.
 - `src/test/intui.test.ts`: mocked transport and parser regression tests,

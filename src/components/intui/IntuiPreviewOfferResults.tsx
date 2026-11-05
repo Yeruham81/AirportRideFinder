@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { CATEGORY_LABEL, CATEGORY_ORDER } from "@/domain/vehicle-taxonomy";
-import { describeCancellation } from "@/domain/cancellation";
-import { formatMoney } from "@/domain/money";
 import type { NormalizedTransferOffer, VehicleCategory } from "@/domain/types";
+import { groupIntuiPreviewOffers } from "@/search/intui-preview-groups";
+import { IntuiPreviewCategorySections } from "./IntuiPreviewCategorySections";
 import {
   parsePreviewPrice,
   selectIntuiPreviewOffers,
@@ -58,6 +58,13 @@ export function IntuiPreviewOfferResults({
     sort,
   }), [offers, invalidPrice, category, passengers, luggage, minPriceMinor, maxPriceMinor, sort]);
 
+  const groups = useMemo(() => groupIntuiPreviewOffers(filtered), [filtered]);
+  // Reset an expanded category after the user changes any filter or sort,
+  // so a new selection shows at most three cards in each category.
+  const groupViewKey = [
+    category, passengers, luggage, minPrice, maxPrice, sort,
+  ].join("|");
+
   function clearFilters() {
     setCategory("all");
     setPassengers(searchedPassengers);
@@ -70,8 +77,8 @@ export function IntuiPreviewOfferResults({
   const fieldStyle = "mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
   return (
-    <div className="space-y-5">
-      <section aria-labelledby="intui-filter-heading" className="rounded-xl border bg-card p-4 shadow-card sm:p-5">
+    <div className="space-y-6">
+      <section aria-labelledby="intui-filter-heading" className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/70 p-4 shadow-card sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 id="intui-filter-heading" className="font-display text-lg font-bold">Filter transfer offers</h2>
@@ -175,7 +182,7 @@ export function IntuiPreviewOfferResults({
         )}
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-2" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-white px-4 py-3 shadow-sm" aria-live="polite">
         <p className="text-sm font-semibold">
           {invalidPrice ? "Invalid price filter" : `${filtered.length} of ${offers.length} transfer offers`}
         </p>
@@ -191,32 +198,14 @@ export function IntuiPreviewOfferResults({
         </div>
       )}
 
-      <div className="space-y-3">
-        {filtered.map((offer) => (
-          <article key={offer.id} className="rounded-xl border bg-card p-5 shadow-card">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h3 className="font-display font-bold">{CATEGORY_LABEL[offer.category]}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{offer.providerVehicleLabel}</p>
-                <p className="mt-2 text-sm">
-                  Up to {offer.maxPassengers} passengers · Up to {offer.maxLuggage} bags
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {describeCancellation(offer.cancellation).headline}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-display text-2xl font-extrabold">{formatMoney(offer.price.quotedPrice)}</p>
-                <p className="text-xs text-muted-foreground">Quoted transfer price</p>
-                <p className="mt-1 text-xs text-muted-foreground">Fees / extras not confirmed</p>
-              </div>
-            </div>
-            <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
-              Read-only quote · Booking with the provider is not yet available.
-            </p>
-          </article>
-        ))}
-      </div>
+      {!invalidPrice && groups.length > 0 && (
+        <IntuiPreviewCategorySections
+          key={groupViewKey}
+          groups={groups}
+          searchedLuggage={searchedLuggage}
+          sort={sort}
+        />
+      )}
     </div>
   );
 }
