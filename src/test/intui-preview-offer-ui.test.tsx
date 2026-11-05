@@ -37,7 +37,7 @@ describe("Intui preview filter UI", () => {
     fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "price_desc" } });
     expect(cardText()[0]).toContain("$315.50");
     expect(cardText()[2]).toContain("$123.03");
-    expect(original[0].id).toBe("business");
+    expect(original[0]?.id).toBe("business");
   });
 
   it("filters by category and capacity entirely on the client", () => {
