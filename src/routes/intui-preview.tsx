@@ -1,12 +1,10 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { getLocation } from "@/data/locations";
-import { describeCancellation } from "@/domain/cancellation";
-import { formatMoney } from "@/domain/money";
-import { CATEGORY_LABEL } from "@/domain/vehicle-taxonomy";
 import { loadIntuiPreview, unlockIntuiPreview, lockIntuiPreview } from "@/search/intui-preview.functions";
 import { parseSearchParams } from "@/search/validation";
 import { INTUI_PREVIEW_MESSAGES } from "@/search/intui-preview-errors";
+import { IntuiPreviewOfferResults } from "@/components/intui/IntuiPreviewOfferResults";
 
 export const Route = createFileRoute("/intui-preview")({
   validateSearch: (raw: Record<string, unknown>) => parseSearchParams(raw),
@@ -215,32 +213,12 @@ function IntuiPreview() {
             These are live provider amounts for this search, but fee inclusion and
             optional extras have not been confirmed. No booking links are enabled.
           </div>
-          <div className="space-y-3">
-            {result.offers.map((offer) => (
-              <article key={offer.id} className="rounded-xl border bg-card p-5 shadow-card">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 className="font-display font-bold">{CATEGORY_LABEL[offer.category]}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{offer.providerVehicleLabel}</p>
-                    <p className="mt-2 text-sm">
-                      Up to {offer.maxPassengers} passengers · Up to {offer.maxLuggage} bags
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {describeCancellation(offer.cancellation).headline}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display text-2xl font-extrabold">{formatMoney(offer.price.quotedPrice)}</p>
-                    <p className="text-xs text-muted-foreground">Quoted transfer price</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Fees / extras not confirmed</p>
-                  </div>
-                </div>
-                <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
-                  Read-only quote · Booking with the provider is not yet available.
-                </p>
-              </article>
-            ))}
-          </div>
+          <IntuiPreviewOfferResults
+            key={searchKey}
+            offers={result.offers}
+            searchedPassengers={search.pax ?? 1}
+            searchedLuggage={search.bags ?? 0}
+          />
         </>
       )}
 
