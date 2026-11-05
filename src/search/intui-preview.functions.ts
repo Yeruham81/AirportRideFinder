@@ -25,11 +25,11 @@ const previewSearchSchema = z.object({
 export const loadIntuiPreview = createServerFn({ method: "POST" })
   .validator((input: unknown) => previewSearchSchema.parse(input))
   .handler(async ({ data }) => {
-    if (process.env.INTUI_PREVIEW_ENABLED !== "true") {
+    if (process.env['INTUI_PREVIEW_ENABLED'] !== "true") {
       return { kind: "disabled" as const };
     }
-    if (process.env.INTUI_LIVE_ENABLED !== "true" ||
-      !process.env.INTUI_API_KEY?.trim()) {
+    if (process.env['INTUI_LIVE_ENABLED'] !== "true" ||
+      !process.env['INTUI_API_KEY']?.trim()) {
       return { kind: "unconfigured" as const };
     }
 
