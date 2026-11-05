@@ -27,7 +27,7 @@ const mockJson = (status: number, body: unknown, headers: Record<string, string>
 describe("Intui GEO request (pure, never makes network calls)", () => {
   it("builds documented one-way coordinate request for London in USD", () => {
     expect(query).toEqual({
-      coordinatesType: "geo",
+      coordinatesType: "GEO",
       gpsLatR: pickup.coords!.lat, gpsLngR: pickup.coords!.lng,
       gpsLatEnd: dropoff.coords!.lat, gpsLngEnd: dropoff.coords!.lng,
       adults: 2, arrivalDateTime: "2026-12-15T10:05:00",
