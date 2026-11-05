@@ -130,4 +130,43 @@ describe("Intui category-first preview", () => {
     expect(economy.textContent).toContain("Fees / extras not confirmed");
     expect(economy.textContent).toContain("Booking not yet available");
   });
+  it("renders one full-width comparison row per offer with aligned provider, capacity, terms and price", () => {
+    render(<IntuiPreviewOfferResults offers={original} searchedPassengers={2} searchedLuggage={2} />);
+    const van = section("Minivan");
+    const rows = within(van).getAllByTestId("intui-offer-row");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]?.getAttribute("data-provider")).toBe("intui");
+    expect(rows[0]?.getAttribute("data-price-minor")).toBe("10101");
+    expect(rows[0]?.querySelector("[class*='lg:grid-cols-']")).not.toBeNull();
+    expect(rows[0]?.textContent).toContain("Live provider quote");
+    expect(rows[0]?.textContent).toContain("Up to 6 people");
+    expect(rows[0]?.textContent).toContain("Up to 3 bags");
+    expect(rows[0]?.textContent).toContain("Quoted transfer price");
+    expect(rows[0]?.textContent).toContain("Booking not yet available");
+    // Full-width rows retain the category-level three-offer limit.
+    fireEvent.click(within(van).getByRole("button", { name: /Show 2 more/ }));
+    expect(within(van).getAllByTestId("intui-offer-row")).toHaveLength(5);
+  });
+
+  it("borrows demo card styling without leaking sample claims or fake booking links", () => {
+    render(<IntuiPreviewOfferResults offers={original} searchedPassengers={2} searchedLuggage={2} />);
+    const economy = within(section("Economy car")).getByTestId("intui-offer-row");
+    expect(within(economy).getByText("Intui.travel")).toBeTruthy();
+    expect(within(economy).getByText("Free cancellation")).toBeTruthy();
+    expect(within(economy).getByText("Until 24h before pickup")).toBeTruthy();
+    expect(within(economy).getByText("Meet & greet")).toBeTruthy();
+    expect(within(economy).getByText("Fees / extras not confirmed")).toBeTruthy();
+    expect(within(economy).queryByRole("button", { name: /View provider offer|Book now/ })).toBeNull();
+    expect(within(economy).queryByRole("link")).toBeNull();
+    expect(economy.textContent).not.toContain("Fictional provider");
+    expect(economy.textContent).not.toContain("Sample total");
+    expect(economy.textContent).not.toContain("Taxes & fees included");
+
+    const business = within(section("Business sedan")).getByTestId("intui-offer-row");
+    expect(business.textContent).toContain("Cancellation terms not available");
+    expect(business.textContent).not.toContain("Free cancellation");
+    const van = within(section("Minivan")).getAllByTestId("intui-offer-row");
+    expect(van[1]?.textContent).toContain("Extra bag capacity");
+  });
+
 });
