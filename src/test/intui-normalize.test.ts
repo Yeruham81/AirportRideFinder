@@ -74,7 +74,7 @@ describe("Intui offer normalization — pure and conservative", () => {
     const invalid = [
       withInfo({ productid: "" }),
       withInfo({ productid: "   " }),
-      withInfo({ productid: "bad\\nid" }),
+      withInfo({ productid: "bad\nid" }),
       withInfo({ productid: "https://intui.travel/order" }),
       withInfo({ productid: "x".repeat(257) }),
     ];
