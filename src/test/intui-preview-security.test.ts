@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { webcrypto } from "node:crypto";
 import {
   checkPreviewPassword,
   consumePreviewLimit,
@@ -8,6 +8,9 @@ import {
   resetPreviewLimitForTests,
   verifyPreviewSession,
 } from "@/search/intui-preview-security";
+
+beforeAll(() => vi.stubGlobal("crypto", webcrypto));
+afterAll(() => vi.unstubAllGlobals());
 
 const secrets = {
   accessPassword: "test-only-not-a-real-password-123456789",
