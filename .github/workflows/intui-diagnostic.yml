@@ -10,6 +10,7 @@ permissions:
 jobs:
   intui-diagnostic:
     if: >-
+      false && # Completed one-shot diagnostic on 2026-11-05; do not re-run
       github.event.label.name == 'documentation' &&
       github.event.pull_request.number == 1 &&
       github.event.pull_request.head.ref == 'feature/intui-api-safe-2026-11-05' &&
