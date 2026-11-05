@@ -35,11 +35,11 @@ export type IntuiTransportResult =
 export async function fetchIntuiGetAvailCar(
   request: IntuiGeoRequest,
   options: {
-    env?: IntuiEnvironment;
-    fetchImpl?: typeof fetch;
-    timeoutMs?: number;
-    normalization?: IntuiNormalizationContext;
-    signal?: AbortSignal;
+    env?: IntuiEnvironment | undefined;
+    fetchImpl?: typeof fetch | undefined;
+    timeoutMs?: number | undefined;
+    normalization?: IntuiNormalizationContext | undefined;
+    signal?: AbortSignal | undefined;
   } = {},
 ): Promise<IntuiTransportResult> {
   const env = options.env ?? process.env;
