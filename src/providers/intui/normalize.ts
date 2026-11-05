@@ -18,7 +18,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 function asInteger(value: unknown, min = 0, max = 100): number | null {
   const n = typeof value === "number" ? value
-    : typeof value === "string" && /^(0|[1-9][0-9]{0,7})$/.test(value) ? Number(value)
+    : typeof value === "string" && /^(0|[1-9][0-9]{0,14})$/.test(value) ? Number(value)
     : Number.NaN;
   return Number.isSafeInteger(n) && n >= min && n <= max ? n : null;
 }
@@ -27,6 +27,8 @@ function classifyBody(body: unknown, vehicleClass: unknown): VehicleCategory | n
   if (typeof body !== "string" || typeof vehicleClass !== "string") return null;
   // Whitelist of documented Intui vehicle classes and bodies. All ambiguous,
   // non-road and combined modes are omitted, not grouped as interchangeable.
+  const roadClass = ["Economy class", "Standard", "Business", "Luxury", "N/a"].includes(vehicleClass);
+  if (!roadClass) return null;
   if (body === "Minivan") return "minivan";
   if (body === "Minibus" || body === "Bus" || body === "Coach") return "minibus";
   if (body === "Limousine" && vehicleClass === "Luxury") return "executive";
