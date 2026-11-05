@@ -1,34 +1,41 @@
-# Isolated Intui development
+# Isolated Intui.travel provider integration
 
-Not imported by any route, registry, or public endpoint. No network transport,
-secret reads, bookings, payments, tracked links, or UI wiring are enabled.
+This is **development code**, not a live booking provider. It is not imported by
+any site route, public endpoint, or the four-provider demonstration registry.
+It makes no network calls unless a separate server-side caller invokes the
+transport with both `INTUI_LIVE_ENABLED=true` and a secure `INTUI_API_KEY`.
+Neither variable is stored in source code. No API calls have been made in
+development, and no site deployment has been requested.
 
-Source: https://support.travelpayouts.com/hc/en-us/articles/360016804119-intui-travel-API
-(official help-center JSON version inspected during development).
+## Implemented
 
-Verified GEO fields: coordinatesType, gpsLatR/gpsLngR, gpsLatEnd/gpsLngEnd,
-adults, arrivalDateTime (local ISO without offset, five-minute increments),
-currency, lang, multiprice. GEO is one-way; bookingType is ignored and omitted.
-The article labels the method GET but demonstrates POST with JSON and apikey.
-No authentication header is inferred.
+- `request.ts`: validated one-way GEO request fields, coordinates, adults,
+  local pickup datetime (5-minute increments), USD/EUR and English.
+- `response.ts`: conservative metadata diagnostics and explicit error
+  statuses. All real nonempty replies currently fail closed and yield **zero**
+  price offers, because the exact `pricing.allprice` structure and currency
+  semantics have not been verified against a real sample.
+- `client.server.ts`: isolated gated server-only HTTPS POST JSON transport,
+  following the official PHP example which places the key in the JSON body,
+  with HTTP/error/timeout handling and no retries. It strips provider raw
+  data, keys and booking URLs from returned diagnostic statuses.
+- `adapter.server.ts`: disabled ProviderAdapter scaffold, intentionally not
+  included in `providers/registry.ts`.
+- `src/test/intui.test.ts`: mocked transport and parser regression tests,
+  requiring no external API calls.
 
-Verified response paths: status, LocationInfo.travelling, info.maxpax/luggage,
-info.vehicle_type/type_vehicle/vehicle_class/free_cancellation,
-additional.meet_greet. Strict numeric private-transfer capacities only.
-Zero cancellation hours means no free cancellation; it does not prove a
-non-refundable policy. Fees, waiting time, and quote expiry remain unknown.
+## Before activation
 
-The exact pricing.allprice JSON structure and currency representation have not
-been independently validated. All nonempty replies currently fail closed;
-diagnostics contain only verified metadata, never raw prices or booking URLs.
-No normalized offer is emitted and no quote timestamp is fabricated.
+1. Independently verify the exact `pricing.allprice` JSON structure and the
+   total amount/currency for private, one-way offers.
+2. Implement tested normalized offers without assuming taxes, vehicle
+   capacities, cancellation terms or expiry.
+3. Confirm how Travelpayouts affiliate links are generated for the temporary
+   `info.intuiUrlOrderSingle` URLs. Never enable raw/untracked redirects.
+4. Create a secure server-side search route and display **only real results**
+   when live mode is explicitly enabled; do not mix them with sample offers.
+5. Verify with one authorized read-only API call in a controlled environment.
+   Never log API keys or raw request/response bodies.
 
-Before implementing transport, verify the POST contract and actual sample price
-shape, then add mocked transport tests for 401/403/429, network errors and bounded
-fetch/body timeouts. Only then use process.env.INTUI_API_KEY within a server-only
-execution boundary, requiring INTUI_LIVE_ENABLED='true' as well. Configuration
-alone cannot activate this scaffold. Store credentials through Lovable's secure
-Project Settings form, never chat. No actual API call was made during development.
-
-Booking stays disabled until Travelpayouts confirms attribution through its link
-generator. Do not turn info.intuiUrlOrderSingle into an active untracked link.
+Official reference:
+https://support.travelpayouts.com/hc/en-us/articles/360016804119-intui-travel-API
