@@ -13,6 +13,7 @@ import { LOCATIONS } from "@/data/locations";
 import { createIntuiAdapter } from "@/providers/intui/adapter.server";
 import { searchTransfers } from "@/search/orchestrator";
 import { buildRequest } from "@/search/validation";
+import { previewFailureCode } from "./intui-preview-errors";
 import {
   checkPreviewPassword,
   consumePreviewLimit,
@@ -112,7 +113,12 @@ export const loadIntuiPreview = createServerFn({ method: "POST" })
     });
     const status = response.results[0]?.status;
     if (status === "no_offers") return { kind: "no_offers" as const };
-    if (status !== "ok") return { kind: "error" as const };
+    if (status !== "ok") {
+      return {
+        kind: "error" as const,
+        code: previewFailureCode(response.results[0]),
+      };
+    }
     return {
       kind: "ok" as const,
       // Never return provider raw links, credentials or actionable offers.
