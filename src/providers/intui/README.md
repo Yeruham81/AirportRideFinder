@@ -1,45 +1,51 @@
 # Isolated Intui.travel provider integration
 
-This is **development code**, not a live booking provider. It is not imported by
-any site route, public endpoint, or the four-provider demonstration registry.
-It makes no network calls unless a separate server-side caller invokes the
-transport with both `INTUI_LIVE_ENABLED=true` and a secure `INTUI_API_KEY`.
-Neither variable is stored in source code. Two authorized read-only GitHub
-Actions diagnostics have been completed; no booking, payment or deployment
-was performed. The one-shot workflow is now disabled.
+This is **development code** with a disabled-by-default **read-only preview**, not
+an active booking provider. It is NOT in the four-provider demonstration registry.
+The separate `/intui-preview` route calls a server function that only searches
+when ALL three environment variables are set on the hosting server:
+`INTUI_PREVIEW_ENABLED=true`, `INTUI_LIVE_ENABLED=true`, and `INTUI_API_KEY`.
+The GitHub Actions secret is NOT automatically a hosting-server secret.
+Do not activate the preview publicly without access control and rate limiting.
+Two authorized read-only GitHub Actions diagnostics were completed, with no
+booking, payment or deployment. The one-shot workflow is disabled.
 
 ## Implemented
 
 - `request.ts`: validated one-way GEO request fields, coordinates, adults,
   local pickup datetime (5-minute increments), USD/EUR and English.
-- `response.ts`: conservative metadata diagnostics and explicit error
-  statuses. All real nonempty replies currently fail closed and yield **zero**
-  price offers. A 05-Nov-2026 shape-only diagnostic confirmed
+- `response.ts`: conservative metadata diagnostics and explicit error statuses.
+  A 05-Nov-2026 shape-only diagnostic confirmed
   `response.<dynamic-key>.travelling` (102 candidate entries) and numeric
-  `pricing.allprice.USD`. Currency/fee and booking eligibility semantics have
-  not yet been fully validated.
+  `pricing.allprice.USD`.
+- `normalize.ts`: strictly validates private-transfer prices, known vehicle
+  classes, passengers, luggage and currency; returns non-actionable live offers
+  while fee inclusion remains unknown. Malformed and non-comparable rows are
+  omitted, not guessed.
 - `client.server.ts`: isolated gated server-only HTTPS POST JSON transport,
   following the official PHP example which places the key in the JSON body,
   with HTTP/error/timeout handling and no retries. It strips provider raw
   data, keys and booking URLs from returned diagnostic statuses.
-- `adapter.server.ts`: disabled ProviderAdapter scaffold, intentionally not
-  included in `providers/registry.ts`.
+- `adapter.server.ts`: opt-in ProviderAdapter implementation, still not
+  included in `providers/registry.ts`; all provider calls stay server-only.
+- `src/search/intui-preview.functions.ts`: gated server-side read-only search.
+- `src/routes/intui-preview.tsx`: separate noindex preview page showing live
+  quoted prices ONLY, without sample data or booking links.
 - `src/test/intui.test.ts`: mocked transport and parser regression tests,
   requiring no external API calls.
 
 ## Before activation
 
-1. Confirm that numeric `pricing.allprice.USD` represents the complete
-   transfer price and which extras/taxes may apply, before displaying amounts.
-2. Implement tested normalized offers without assuming taxes, vehicle
-   capacities, cancellation terms or expiry.
+1. The official Travelpayouts article defines `pricing.allprice` as the total
+   transfer price. Extra charges and fee inclusion vary: the UI marks fee
+   inclusion **unknown**, never promises an all-inclusive final total.
+2. Secure the preview behind access controls and rate limits before enabling
+   it on a hosted server. Set deployment-only environment flags intentionally.
 3. Confirm how Travelpayouts affiliate links are generated for the temporary
    `info.intuiUrlOrderSingle` URLs. Never enable raw/untracked redirects.
-4. Create a secure server-side search route and display **only real results**
-   when live mode is explicitly enabled; do not mix them with sample offers.
-5. Before enabling traffic on the site, validate the safe price parser with
-   mocked fixtures and review deployment secrets. Never log API keys or raw
-   request/response bodies.
+4. When partner attribution is ready, plan a separate public live-mode UX,
+   without mixing fictional providers and real Intui results.
+5. Never log keys or raw API request/response bodies. No booking/payment calls.
 
 Official reference:
 https://support.travelpayouts.com/hc/en-us/articles/360016804119-intui-travel-API
