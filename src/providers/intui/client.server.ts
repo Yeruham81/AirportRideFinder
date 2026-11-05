@@ -43,7 +43,7 @@ export async function fetchIntuiGetAvailCar(
   if (!apiKey) return { status: "missing_secret" };
 
   // Defensive validation, even for calls that bypass the request builder.
-  if (request.coordinatesType !== "geo" || !["USD", "EUR"].includes(request.currency) ||
+  if (request.coordinatesType !== "GEO" || !["USD", "EUR"].includes(request.currency) ||
     !Number.isSafeInteger(request.adults) || request.adults < 1 ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:[0-5]\d:00$/.test(request.arrivalDateTime) ||
     Number(request.arrivalDateTime.slice(14, 16)) % 5 !== 0 ||
