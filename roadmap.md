@@ -25,7 +25,9 @@
 - [x] Diagnostic workflow disabled following its authorized run; secrets and raw API responses never logged
 - [x] Opt-in server-side private-transfer adapter: strict price/capacity/category normalization, unknown fee inclusion, disabled booking, isolated from mock providers
 - [x] Separate noindex /intui-preview read-only page and server function, OFF by default until deployment-only INTUI_API_KEY + INTUI_LIVE_ENABLED=true + INTUI_PREVIEW_ENABLED=true
-- [ ] Enable preview only in an access-controlled environment with rate limits; verify deployment secret separately from GitHub Actions secret
+- [x] Preview login: strong server-side access password, 30-minute HMAC-signed HttpOnly cookie, authenticated handler, and best-effort in-process request throttles
+- [ ] Configure a secured hosting environment with perimeter access control, shared/distributed rate limit and all five server secrets; never assume GitHub Actions secrets are hosting secrets
+- [ ] Perform protected end-to-end browser preview with the real Intui data, before enabling public comparison
 - [ ] Public comparison and redirects — not started. Requires provider tracking/affiliate attribution and safe live-mode UX; no booking/payment integration.
 
 ## Later (needs approval)
