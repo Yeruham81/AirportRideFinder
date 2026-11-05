@@ -110,14 +110,17 @@ function IntuiPreview() {
   const to = getLocation(search.to ?? "");
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-teal">Private preview · Read only</p>
-        <h1 className="mt-2 font-display text-2xl font-bold">Intui.travel transfer offers</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+      <div className="overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/50 px-5 py-6 shadow-card sm:px-7">
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private preview · Live quotes · Read only</p>
+        <h1 className="mt-2 font-display text-2xl font-extrabold text-foreground sm:text-3xl">Intui.travel transfer offers</h1>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">
           {from?.shortName ?? "Unknown pickup"} → {to?.shortName ?? "Unknown destination"}
           {search.date ? ` · ${search.date}` : ""}
           {search.time ? ` at ${search.time} local time` : ""}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Browse vehicle categories, compare prices, and expand only the sections you need.
         </p>
       </div>
 
@@ -208,10 +211,13 @@ function IntuiPreview() {
               Lock preview
             </button>
           </div>
-          <div role="status" className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-            {result.offers.length} verified private-transfer price {result.offers.length === 1 ? "entry" : "entries"}.
-            These are live provider amounts for this search, but fee inclusion and
-            optional extras have not been confirmed. No booking links are enabled.
+          <div role="status" className="rounded-xl border border-teal/20 bg-teal-soft/40 p-4 text-sm text-foreground">
+            <strong className="font-display">{result.offers.length} live private-transfer {result.offers.length === 1 ? "offer" : "offers"}</strong>
+            <span className="text-muted-foreground"> · Verified price and vehicle data for this search.</span>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Quoted provider prices can change. Fees and optional extras are not fully confirmed.
+              Bookings are not yet available.
+            </p>
           </div>
           <IntuiPreviewOfferResults
             key={searchKey}
