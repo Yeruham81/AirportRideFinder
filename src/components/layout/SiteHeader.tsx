@@ -1,8 +1,12 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Plane } from "lucide-react";
 import { COPY } from "@/content/strings";
 
 export function SiteHeader() {
+  const isIntuiPreview = useRouterState({
+    select: (state) => state.location.pathname === "/intui-preview",
+  });
+
   return (
     <header className="sticky top-0 z-30 border-b bg-surface/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[72px]">
@@ -25,9 +29,11 @@ export function SiteHeader() {
           >
             Compare Transfers
           </Link>
-          <span className="rounded-full border border-teal/30 bg-teal-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal">
-            Demo · sample data
-          </span>
+          {!isIntuiPreview && (
+            <span className="rounded-full border border-teal/30 bg-teal-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal">
+              Demo · sample data
+            </span>
+          )}
         </nav>
       </div>
     </header>
