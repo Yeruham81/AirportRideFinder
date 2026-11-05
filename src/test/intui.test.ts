@@ -153,10 +153,28 @@ describe("Intui server transport (all calls mocked)", () => {
     expect(url.startsWith("https://")).toBe(true);
     expect(url).not.toContain(liveEnv.INTUI_API_KEY);
     expect(init.method).toBe("POST");
-    expect(init.redirect).toBe("error");
+    expect(init.redirect).toBe("manual");
     expect(JSON.parse(init.body as string)).toMatchObject({ ...query, apikey: liveEnv.INTUI_API_KEY });
     expect(JSON.stringify(result)).not.toContain(liveEnv.INTUI_API_KEY);
   });
+  it("does not automatically follow redirects or forward the API key to a new host", async () => {
+    const mock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(null, {
+        status: 302,
+        headers: { Location: "https://other.example/collect" },
+      })
+    );
+    const result = await fetchIntuiGetAvailCar(query, {
+      env: liveEnv,
+      fetchImpl: mock as unknown as typeof fetch,
+    });
+    expect(result).toEqual({ status: "http_error", httpStatus: 302 });
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(mock.mock.calls[0]?.[1]?.redirect).toBe("manual");
+    expect(JSON.stringify(result)).not.toContain("other.example");
+    expect(JSON.stringify(result)).not.toContain(liveEnv.INTUI_API_KEY);
+  });
+
   it("handles HTTP and provider authorization failures and rate limits", async () => {
     expect((await fetchIntuiGetAvailCar(query, { env: liveEnv, fetchImpl: mockJson(403, {}) })).status).toBe("unauthorized");
     expect((await fetchIntuiGetAvailCar(query, { env: liveEnv, fetchImpl: mockJson(200, { status: "authorization_error" }) })).status).toBe("unauthorized");
