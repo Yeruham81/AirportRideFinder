@@ -73,6 +73,23 @@ restricted host), a distributed request quota, and private `Cache-Control` for
 all preview RPCs. No booking URLs, raw API payloads, or keys are serialized to
 the browser.
 
+## Cloudflare-compatible requests and manual retry
+
+The initial Lovable-hosted preview showed `provider_unreachable` despite a
+successful API smoke test from GitHub Actions. The Intui HTTP transport had
+`redirect: "error"`, which **Cloudflare Workers does not implement** and
+which throws a `TypeError` before contacting the API. The transport now uses
+`redirect: "manual"`, explicitly rejects 3xx without forwarding the API key
+to another destination, and leaves all booking/payment operations disabled.
+Reference: https://developers.cloudflare.com/workers/runtime-apis/request/
+
+The Retry button invokes the same authenticated preview server function
+again (rather than only invalidating a cached route loader), displays progress,
+and presents the result of the new attempt. The password entered into the
+form is `INTUI_PREVIEW_ACCESS_PASSWORD`; `INTUI_PREVIEW_SESSION_SECRET`
+is a separate private server secret for signing cookies and is never entered
+into the form.
+
 ## Diagnosing a failed hosted preview
 
 On a successful password login, the preview can still fail if the hosting
