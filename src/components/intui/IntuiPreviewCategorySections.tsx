@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from "react";
 import {
-  BriefcaseBusiness, BusFront, CarFront,
-  Check, ChevronDown, ChevronUp, Crown, Luggage, UsersRound,
+  BriefcaseBusiness, BusFront, CarFront, Check, ChevronDown, ChevronUp,
+  CircleHelp, Clock, Crown, Handshake, Info, Luggage, UsersRound, X,
 } from "lucide-react";
 import { describeCancellation } from "@/domain/cancellation";
 import { formatMoney } from "@/domain/money";
@@ -191,7 +191,7 @@ function IntuiCategorySection({
         </div>
       </div>
 
-      <div id={listId} className="grid gap-3 bg-slate-50/65 p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-3">
+      <div id={listId} className="space-y-3 bg-slate-50/65 p-3 sm:p-4">
         {visible.map((offer) => (
           <IntuiOfferCard
             key={offer.id}
@@ -228,6 +228,11 @@ function IntuiCategorySection({
   );
 }
 
+/**
+ * Wide comparison row borrowing the strong provider / capacity / policy /
+ * price hierarchy of the demo results. The quote is from Intui only:
+ * unlike demo cards, no booking button or fictional-provider branding exists.
+ */
 function IntuiOfferCard({
   offer, isLowest, searchedLuggage,
 }: {
@@ -237,78 +242,115 @@ function IntuiOfferCard({
 }) {
   const cancellation = describeCancellation(offer.cancellation);
   const extraBags = offer.maxLuggage >= searchedLuggage + 2;
+  const CancellationIcon = cancellation.tone === "positive" ? Check
+    : cancellation.tone === "negative" ? X
+    : cancellation.tone === "neutral" ? Info
+    : CircleHelp;
+  const cancellationTone = cancellation.tone === "positive" ? "text-emerald-700"
+    : cancellation.tone === "negative" ? "text-slate-600"
+    : cancellation.tone === "neutral" ? "text-amber-800"
+    : "text-slate-600";
+  const price = formatMoney(offer.price.quotedPrice);
 
   return (
     <article
+      data-testid="intui-offer-row"
+      data-provider="intui"
+      data-price-minor={offer.price.quotedPrice.minor}
+      aria-label={`Intui.travel, ${CATEGORY_LABEL[offer.category]}, ${price}`}
       className={
-        "flex h-full min-w-0 flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-card " +
-        (isLowest ? "border-emerald-300 ring-1 ring-emerald-100" : "border-border")
+        "relative rounded-xl border bg-white shadow-sm transition-colors hover:border-primary/40 hover:shadow-card " +
+        (isLowest ? "border-teal/60 ring-1 ring-teal/20" : "border-border")
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Private transfer
-          </p>
-          <h3 className="mt-1 font-display text-base font-bold leading-snug text-foreground">
-            {offer.providerVehicleLabel || CATEGORY_LABEL[offer.category]}
-          </h3>
+      {isLowest && (
+        <span className="absolute -top-px left-4 rounded-b-md bg-teal px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-on-brand">
+          Lowest in category
+        </span>
+      )}
+      <div className={
+        "grid gap-4 p-4 sm:p-5 md:grid-cols-2 md:gap-5 " +
+        "lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,1.15fr)_minmax(9.5rem,0.8fr)] " +
+        "lg:items-center lg:gap-4 " +
+        (isLowest ? "pt-8 sm:pt-8" : "")
+      }>
+        {/* Intui identity + actual vehicle wording, not fictional demo providers. */}
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden="true"
+            className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-lg font-extrabold text-primary-foreground"
+          >
+            I
+          </span>
+          <div className="min-w-0">
+            <p className="font-display text-base font-extrabold text-primary">Intui.travel</p>
+            <p className="text-xs text-muted-foreground">Live provider quote</p>
+            <div className="mt-3 flex items-start gap-2">
+              <CarFront className="mt-0.5 size-4 shrink-0 text-primary/75" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  {CATEGORY_LABEL[offer.category]}
+                </p>
+                <p className="break-words text-xs text-muted-foreground">
+                  Listed as “{offer.providerVehicleLabel || CATEGORY_LABEL[offer.category]}”
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {isLowest && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-900">
-            <Check className="size-3.5" aria-hidden /> Lowest in category
-          </span>
-        )}
-        {offer.cancellation.kind === "free_until" && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-teal-soft px-2.5 py-1 text-xs font-semibold text-teal">
-            Free cancellation
-          </span>
-        )}
-        {offer.meetAndGreet === true && (
-          <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
-            Meet &amp; greet
-          </span>
-        )}
-        {extraBags && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
-            <Luggage className="size-3" aria-hidden /> Extra bag capacity
-          </span>
-        )}
-      </div>
+        {/* Comparable capacity information is aligned in one column. */}
+        <ul className="space-y-2 text-sm text-foreground">
+          <li className="flex items-center gap-2">
+            <UsersRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span>Up to <strong className="font-semibold tabular-nums">{offer.maxPassengers}</strong> people</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Luggage className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span>Up to <strong className="font-semibold tabular-nums">{offer.maxLuggage}</strong> bags</span>
+          </li>
+          {extraBags && (
+            <li className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+              <Luggage className="size-3.5" aria-hidden /> Extra bag capacity
+            </li>
+          )}
+        </ul>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-sm">
-        <div>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <UsersRound className="size-3.5" aria-hidden /> Passengers
-          </span>
-          <strong className="mt-0.5 block tabular-nums text-foreground">Up to {offer.maxPassengers}</strong>
+        {/* Never infer free waiting time, included fees, or cancellation terms. */}
+        <div className="space-y-2 text-sm">
+          <div>
+            <p className={"flex items-center gap-2 font-semibold " + cancellationTone}>
+              <CancellationIcon className="size-4 shrink-0" aria-hidden />
+              {cancellation.headline}
+            </p>
+            <p className="mt-0.5 pl-6 text-xs text-muted-foreground">{cancellation.detail}</p>
+          </div>
+          {offer.meetAndGreet === true && (
+            <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Handshake className="size-4 shrink-0" aria-hidden /> Meet &amp; greet
+            </p>
+          )}
+          {offer.waitingTimeMins !== null && (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="size-4 shrink-0" aria-hidden />
+              Waiting time: {offer.waitingTimeMins} min
+            </p>
+          )}
         </div>
-        <div>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Luggage className="size-3.5" aria-hidden /> Bags
-          </span>
-          <strong className="mt-0.5 block tabular-nums text-foreground">Up to {offer.maxLuggage}</strong>
-        </div>
-      </div>
 
-      <div className="mt-auto pt-4">
-        <div className="border-t border-border pt-3">
-          <p className="text-xs font-medium text-muted-foreground">Quoted transfer price</p>
-          <p className="mt-0.5 font-display text-2xl font-extrabold tabular-nums tracking-tight text-foreground">
-            {formatMoney(offer.price.quotedPrice)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">Fees / extras not confirmed</p>
+        {/* Demo-style prominent price, deliberately no fake View Deal CTA. */}
+        <div className="flex items-center justify-between gap-4 border-t border-border pt-3 md:justify-end lg:flex-col lg:items-end lg:justify-center lg:gap-1 lg:border-t-0 lg:pt-0 lg:text-right">
+          <div>
+            <p className="font-display text-3xl font-extrabold leading-none tabular-nums tracking-tight text-foreground">
+              {price}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Quoted transfer price</p>
+            <p className="mt-1 text-xs font-medium text-amber-800">Fees / extras not confirmed</p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-center text-[11px] font-semibold text-slate-600">
+            Booking not yet available
+          </span>
         </div>
-        <p className="mt-3 border-t border-dashed border-border pt-3 text-xs text-muted-foreground">
-          {cancellation.headline}
-          {cancellation.tone === "positive" ? " · " + cancellation.detail : ""}
-        </p>
-        <p className="mt-2 text-xs font-medium text-muted-foreground">
-          Read-only quote · Booking not yet available
-        </p>
       </div>
     </article>
   );
