@@ -48,6 +48,14 @@ disabled by default and requires an explicit server-side diagnostic flag.
 - `src/search/intui-preview.functions.ts`: gated server-side read-only search.
 - `src/routes/intui-preview.tsx`: separate noindex preview page showing live
   quoted prices ONLY, without sample data or booking links.
+- `src/components/intui/IntuiPreviewOfferResults.tsx`: client-only price sorting
+  (lowest first by default, highest first optionally) and filter controls for
+  vehicle category, minimum seats, minimum bags and exact min/max quoted
+  prices. Counters and empty states update without extra Intui API requests.
+  Capacity filters apply only within the original passenger/luggage search.
+  `src/search/intui-preview-filters.ts` tests precise minor-unit arithmetic.
+- The global sample-data header badge is omitted on `/intui-preview` only.
+  It remains present on the fictional demo pages to avoid confusion.
 - `src/test/intui.test.ts`: mocked transport and parser regression tests,
   requiring no external API calls.
 
