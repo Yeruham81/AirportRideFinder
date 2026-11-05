@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from "react";
 import {
-  ArrowDownRight, ArrowUpRight, BriefcaseBusiness, BusFront, CarFront,
+  BriefcaseBusiness, BusFront, CarFront,
   Check, ChevronDown, ChevronUp, Crown, Luggage, UsersRound,
 } from "lucide-react";
 import { describeCancellation } from "@/domain/cancellation";
