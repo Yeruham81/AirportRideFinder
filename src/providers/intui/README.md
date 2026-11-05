@@ -64,7 +64,14 @@ disabled by default and requires an explicit server-side diagnostic flag.
   a provider's stated free cancellation, meet-and-greet, and capacity beyond
   the requested baggage. No guessed ratings, popularity or booking availability.
   Changing any filter/sort resets sections to collapsed and never calls Intui
-  again. A wide responsive grid reduces vertical scrolling.
+  again. Offers appear as **one wide comparison row each**, borrowing the
+  demo page's visual hierarchy (real provider identity, vehicle details,
+  aligned passenger/luggage capacity, cancellation terms, prominent price).
+  Each category still starts with at most three offers and can expand.
+  The rows become stacked sections on small screens. Demo-only claims
+  (fictional providers, sample totals, tax inclusion, "View Deal" buttons)
+  are intentionally excluded: real Intui offers remain read-only with
+  unknown additional fees and no booking redirects.
 - The global sample-data header badge is omitted on `/intui-preview` only.
   It remains present on the fictional demo pages to avoid confusion.
 - `src/test/intui.test.ts`: mocked transport and parser regression tests,
