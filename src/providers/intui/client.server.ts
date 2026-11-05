@@ -11,6 +11,8 @@
  */
 import { parseIntuiResponse, type IntuiParseResult } from "./response";
 import type { IntuiGeoRequest } from "./request";
+import { normalizeIntuiOffers, type IntuiNormalizationContext } from "./normalize";
+import type { NormalizedTransferOffer } from "@/domain/types";
 
 export const INTUI_GET_AVAIL_CAR_URL = "https://api.intui.travel/ver1_0/GetAvailCar/";
 
@@ -23,7 +25,8 @@ export type IntuiTransportResult =
   | { status: "disabled" | "missing_secret" | "unauthorized" | "wrong_params" | "timeout" | "network_error" | "malformed_response" }
   | { status: "rate_limited"; retryAfterSeconds: number | null }
   | { status: "http_error"; httpStatus: number }
-  | { status: "no_offers" | "unverified_price_contract"; data: IntuiParseResult };
+  | { status: "no_offers" | "unverified_price_contract"; data: IntuiParseResult }
+  | { status: "ok"; offers: NormalizedTransferOffer[]; omittedCount: number };
 
 /**
  * No default config enables this function. Tests inject a fake environment and
@@ -35,6 +38,8 @@ export async function fetchIntuiGetAvailCar(
     env?: IntuiEnvironment;
     fetchImpl?: typeof fetch;
     timeoutMs?: number;
+    normalization?: IntuiNormalizationContext;
+    signal?: AbortSignal;
   } = {},
 ): Promise<IntuiTransportResult> {
   const env = options.env ?? process.env;
@@ -52,6 +57,9 @@ export async function fetchIntuiGetAvailCar(
   ) return { status: "wrong_params" };
 
   const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  if (options.signal?.aborted) return { status: "timeout" };
+  options.signal?.addEventListener("abort", onAbort, { once: true });
   const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 10_000, 100), 30_000);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -83,7 +91,13 @@ export async function fetchIntuiGetAvailCar(
     if (parsed.status === "authorization_error") return { status: "unauthorized" };
     if (parsed.status === "wrong_params") return { status: "wrong_params" };
     if (parsed.status === "malformed_response") return { status: "malformed_response" };
-    // Never return raw booking links or unverified prices.
+    if (options.normalization && parsed.status === "unverified_price_contract") {
+      const normalized = normalizeIntuiOffers(body, request, options.normalization);
+      if (normalized.status === "ok") {
+        return { status: "ok", offers: normalized.offers, omittedCount: normalized.omittedCount };
+      }
+    }
+    // Without a trusted context, do not expose even normalized quotes.
     return { status: parsed.status, data: parsed };
   } catch (error) {
     return controller.signal.aborted || (error as { name?: string })?.name === "AbortError"
@@ -91,5 +105,6 @@ export async function fetchIntuiGetAvailCar(
       : { status: "network_error" };
   } finally {
     clearTimeout(timer);
+    options.signal?.removeEventListener("abort", onAbort);
   }
 }
