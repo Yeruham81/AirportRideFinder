@@ -23,6 +23,23 @@ function asInteger(value: unknown, min = 0, max = 100): number | null {
   return Number.isSafeInteger(n) && n >= min && n <= max ? n : null;
 }
 
+/**
+ * Intui productid is an opaque provider identifier. The production response
+ * inspected on 2026-11-05 returned strings, not numeric values.
+ *
+ * Preserve the ID without interpreting it as an integer or booking URL.
+ * It is never used for links and is never marked actionable.
+ */
+function productIdentifier(value: unknown): string | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
+  }
+  if (typeof value !== "string" || value.length > 256) return null;
+  const id = value.trim();
+  if (!id || /[\x00-\x1f\x7f]/.test(id) || id.includes("://")) return null;
+  return id;
+}
+
 function classifyBody(body: unknown, vehicleClass: unknown): VehicleCategory | null {
   if (typeof body !== "string" || typeof vehicleClass !== "string") return null;
   // Whitelist of documented Intui vehicle classes and bodies. All ambiguous,
@@ -103,7 +120,7 @@ export function normalizeIntuiOffers(
     if (!info || info["vehicle_type"] !== "private" ||
       info["perperson"] === true) continue;
 
-    const providerId = asInteger(info["productid"], 1, Number.MAX_SAFE_INTEGER);
+    const providerId = productIdentifier(info["productid"]);
     const maxPassengers = asInteger(info["maxpax"], 1, 50);
     const maxLuggage = asInteger(info["luggage"], 0, 50);
     const category = classifyBody(info["type_vehicle"], info["vehicle_class"]);
@@ -114,7 +131,7 @@ export function normalizeIntuiOffers(
       maxPassengers < ctx.passengers || maxLuggage < ctx.luggage) continue;
 
     // Identical product ids in the same response cannot be treated as unique.
-    const productKey = String(providerId);
+    const productKey = providerId;
     if (seen.has(productKey)) continue;
     seen.add(productKey);
 
@@ -125,7 +142,7 @@ export function normalizeIntuiOffers(
       .join(" · ")
       .slice(0, 100);
     const offer: NormalizedTransferOffer = {
-      id: `intui:${ctx.searchRef}:${providerId}`,
+      id: `intui:${ctx.searchRef}:${index}`,
       providerId: "intui",
       providerOfferId: productKey,
       searchRef: ctx.searchRef,
