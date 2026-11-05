@@ -19,8 +19,10 @@ hosting-provider WAF/shared distributed limiter and access restrictions**.
 The signed `__Host-arf-intui-preview` session cookie is HttpOnly, Secure,
 SameSite=Strict, and expires after 30 minutes. Authentication is enforced by
 the server function itself, not merely by a UI route guard.
-Two authorized read-only GitHub Actions diagnostics were completed, with no
-booking, payment or deployment. The one-shot workflow is disabled.
+Authorized, single-request GitHub Actions diagnostics and a full adapter
+smoke test were completed, with no booking, payment or deployment. Temporary
+trigger workflows were removed afterward; the adapter smoke script remains
+disabled by default and requires an explicit server-side diagnostic flag.
 
 ## Implemented
 
@@ -28,12 +30,15 @@ booking, payment or deployment. The one-shot workflow is disabled.
   local pickup datetime (5-minute increments), USD/EUR and English.
 - `response.ts`: conservative metadata diagnostics and explicit error statuses.
   A 05-Nov-2026 shape-only diagnostic confirmed
-  `response.<dynamic-key>.travelling` (102 candidate entries) and numeric
-  `pricing.allprice.USD`.
+  `response.<dynamic-key>.travelling` (102 candidate entries), **opaque string**
+  `info.productid`, and numeric `pricing.allprice.USD`.
 - `normalize.ts`: strictly validates private-transfer prices, known vehicle
   classes, passengers, luggage and currency; returns non-actionable live offers
   while fee inclusion remains unknown. Malformed and non-comparable rows are
-  omitted, not guessed.
+  omitted, not guessed. A controlled, single-request integration test on
+  05-Nov-2026 yielded **95 normalized, non-actionable offers out of 102** on
+  Heathrow → central London for 2 passengers and 2 bags. Cheapest quote in
+  that test was **USD 111.35** (time-specific, not a guaranteed current price).
 - `client.server.ts`: isolated gated server-only HTTPS POST JSON transport,
   following the official PHP example which places the key in the JSON body,
   with HTTP/error/timeout handling and no retries. It strips provider raw
