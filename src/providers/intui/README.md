@@ -34,6 +34,22 @@ booking, payment or deployment. The one-shot workflow is disabled.
 - `src/test/intui.test.ts`: mocked transport and parser regression tests,
   requiring no external API calls.
 
+
+## Read-only preview URL (only after secured server configuration)
+
+The route is intentionally **not linked from the public site**. When enabled on
+an access-controlled server, a sample search can be opened at:
+
+`/intui-preview?from=lhr&to=central-london&date=2026-12-15&time=10%3A05&pax=2&bags=2`
+
+Use a *future* local pickup date. If all preview flags are not present, this
+route displays a disabled/unconfigured message and does not call Intui.
+
+The GitHub Actions secret is scoped to CI only. To try the preview on hosting,
+configure the API key and preview flags separately in the hosting provider's
+secure server environment. No booking URLs, raw API payloads, or keys are
+serialized to the browser.
+
 ## Before activation
 
 1. The official Travelpayouts article defines `pricing.allprice` as the total
