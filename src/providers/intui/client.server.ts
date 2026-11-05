@@ -67,9 +67,16 @@ export async function fetchIntuiGetAvailCar(
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ ...request, apikey: apiKey }),
-      redirect: "error",
+      // Cloudflare Workers rejects redirect:"error" before any network request.
+      // "manual" is supported and never forwards the API key to a new host.
+      redirect: "manual",
       signal: controller.signal,
     });
+    // Never follow a redirect with the API key in the JSON body.
+    // Report only an HTTP status, not the provider's Location header.
+    if (response.status >= 300 && response.status < 400) {
+      return { status: "http_error", httpStatus: response.status };
+    }
     if (response.status === 401 || response.status === 403) return { status: "unauthorized" };
     if (response.status === 429) {
       const v = response.headers.get("retry-after");
