@@ -31,8 +31,18 @@ export const Route = createFileRoute("/intui-preview")({
 });
 
 function IntuiPreview() {
-  const result = Route.useLoaderData();
+  const loaderResult = Route.useLoaderData();
   const router = useRouter();
+  const search = Route.useSearch();
+  const searchKey = [
+    search.from, search.to, search.date, search.time, search.pax, search.bags,
+  ].join("|");
+  const [retryState, setRetryState] = useState<{
+    searchKey: string;
+    result: typeof loaderResult;
+  } | null>(null);
+  const result = retryState?.searchKey === searchKey ? retryState.result : loaderResult;
+  const [retryStatus, setRetryStatus] = useState<"idle" | "complete" | "failed">("idle");
   const [password, setPassword] = useState("");
   const [loginFeedback, setLoginFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +56,8 @@ function IntuiPreview() {
       const outcome = await unlockIntuiPreview({ data: { password } });
       setPassword("");
       if (outcome.kind === "authenticated") {
+        setRetryState(null);
+        setRetryStatus("idle");
         await router.invalidate();
       } else if (outcome.kind === "rate_limited") {
         setLoginFeedback("Too many attempts. Please try again later.");
@@ -63,12 +75,39 @@ function IntuiPreview() {
     setBusy(true);
     try {
       await lockIntuiPreview();
+      setRetryState(null);
+      setRetryStatus("idle");
       await router.invalidate();
     } finally {
       setBusy(false);
     }
   }
-  const search = Route.useSearch();
+
+  async function retrySearch() {
+    if (busy) return;
+    setBusy(true);
+    setRetryStatus("idle");
+    try {
+      // Call the same authenticated server function directly. Re-invalidating
+      // an unchanged router loader may reuse its cached error response.
+      const next = await loadIntuiPreview({
+        data: {
+          from: search.from ?? "",
+          to: search.to ?? "",
+          date: search.date ?? "",
+          time: search.time ?? "",
+          pax: search.pax ?? 0,
+          bags: search.bags ?? 0,
+        },
+      });
+      setRetryState({ searchKey, result: next });
+      setRetryStatus("complete");
+    } catch {
+      setRetryStatus("failed");
+    } finally {
+      setBusy(false);
+    }
+  }
   const from = getLocation(search.from ?? "");
   const to = getLocation(search.to ?? "");
 
@@ -142,11 +181,21 @@ function IntuiPreview() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => void router.invalidate()}
+            onClick={() => void retrySearch()}
             className="rounded-lg border border-input px-4 py-2 text-sm font-medium text-primary disabled:opacity-50"
           >
-            Retry this search
+            {busy ? "Retrying Intui…" : "Retry this search"}
           </button>
+          {retryStatus === "complete" && (
+            <p role="status" className="text-xs text-muted-foreground">
+              The latest retry completed. The diagnostic above is from that attempt.
+            </p>
+          )}
+          {retryStatus === "failed" && (
+            <p role="alert" className="text-xs text-destructive">
+              Retry could not be submitted. Please refresh this page.
+            </p>
+          )}
         </div>
       )}
       {result.kind === "no_offers" && (
