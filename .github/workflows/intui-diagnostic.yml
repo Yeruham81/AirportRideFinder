@@ -1,0 +1,29 @@
+name: One-shot Intui read-only diagnostic
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  intui-diagnostic:
+    if: >-
+      github.event.label.name == 'intui-diagnostic-once-20261105' &&
+      github.event.pull_request.number == 1 &&
+      github.event.pull_request.head.ref == 'feature/intui-api-safe-2026-11-05' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout reviewed code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Exactly one read-only Intui GetAvailCar request
+        env:
+          INTUI_API_KEY: ${{ secrets.INTUI_API_KEY }}
+          INTUI_DIAGNOSTIC_ALLOWED: "yes"
+        run: node scripts/intui-read-only-check.mjs
