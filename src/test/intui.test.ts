@@ -67,10 +67,69 @@ describe("Intui response parser (fail closed until price contract verified)", ()
     expect(parsed.diagnostics).toHaveLength(1);
     expect(parsed.diagnostics[0]).toMatchObject({
       maxPassengers: 4, maxLuggage: 2, cancellation: { kind: "free_until", hoursBefore: 24 },
-      meetAndGreet: true, priceStatus: "unverified_shape", trackingEnabled: false,
+      meetAndGreet: true, priceStatus: "unverified_contract", trackingEnabled: false,
     });
     expect(JSON.stringify(parsed)).not.toContain("secret-booking");
   });
+
+  it("recognizes observed nested response envelope and string-number capacities", () => {
+    const body = {
+      status: "ok",
+      response: {
+        route_123: {
+          LocationInfo: { distance: 27 },
+          travelling: [
+            {
+              info: {
+                vehicle_type: "private",
+                maxpax: "4", luggage: 2,
+                free_cancellation: "24", type_vehicle: "Sedan",
+                vehicle_class: "Standard",
+              },
+              additional: { meet_greet: 1 },
+              pricing: { allprice: { USD: 69.5 }, allnettoprice: { USD: 50 } },
+            },
+            {
+              info: { maxpax: "2", luggage: 1, free_cancellation: "0" },
+              pricing: { allprice: { EUR: 10 } },
+            },
+          ],
+        },
+      },
+    };
+    const parsed = parseIntuiResponse(body, query);
+    expect(parsed.status).toBe("unverified_price_contract");
+    if (parsed.status !== "unverified_price_contract") throw new Error("expected fail closed");
+    expect(parsed.omittedCount).toBe(2);
+    expect(parsed.offers).toEqual([]);
+    expect(parsed.diagnostics).toHaveLength(2);
+    expect(parsed.diagnostics[0]).toMatchObject({
+      maxPassengers: 4, maxLuggage: 2,
+      cancellation: { kind: "free_until", hoursBefore: 24 },
+      requestedCurrencyPriceType: "number",
+      trackingEnabled: false,
+    });
+    expect(parsed.diagnostics[1]).toMatchObject({
+      maxPassengers: 2, maxLuggage: 1,
+      cancellation: { kind: "unknown" },
+      requestedCurrencyPriceType: "missing_or_invalid",
+    });
+    expect(JSON.stringify(parsed)).not.toContain("route_123");
+    expect(JSON.stringify(parsed)).not.toContain("allnettoprice");
+    expect(JSON.stringify(parsed)).not.toContain("69.5");
+  });
+
+  it("rejects ambiguous response groups without selecting the wrong route", () => {
+    const body = {
+      status: "ok",
+      response: {
+        first: { travelling: [] },
+        second: { travelling: [] },
+      },
+    };
+    expect(parseIntuiResponse(body, query).status).toBe("malformed_response");
+  });
+
   it("rejects unknown and authorization-error payloads", () => {
     expect(parseIntuiResponse({ status: "authorization_error" }, query).status).toBe("authorization_error");
     expect(parseIntuiResponse({ status: "wrong_params" }, query).status).toBe("wrong_params");
