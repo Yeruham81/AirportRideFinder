@@ -47,7 +47,7 @@ describe("Intui offer normalization — pure and conservative", () => {
     expect(result.omittedCount).toBe(0);
     expect(result.offers).toHaveLength(1);
     expect(result.offers[0]).toMatchObject({
-      id: `intui:${context.searchRef}:876543219`,
+      id: `intui:${context.searchRef}:0`,
       providerId: "intui", providerOfferId: "876543219",
       category: "standard_sedan", maxPassengers: 4, maxLuggage: 3,
       price: { quotedPrice: { currency: "USD", minor: 4950 }, displayPrice: null, taxesAndFees: "unknown" },
@@ -59,6 +59,26 @@ describe("Intui offer normalization — pure and conservative", () => {
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("intui.travel/order");
     expect(serialized).not.toContain("allnettoprice");
+  });
+
+  it("accepts opaque string Intui product IDs and rejects unsafe identifiers", () => {
+    const valid = withInfo({ productid: "VAN-AB_456:2/STD" });
+    const result = normalizeIntuiOffers(body([valid, valid]), query, context);
+    expect(result.status).toBe("ok");
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0]).toMatchObject({
+      providerOfferId: "VAN-AB_456:2/STD",
+      id: "intui:" + context.searchRef + ":0",
+      actionable: false,
+    });
+    const invalid = [
+      withInfo({ productid: "" }),
+      withInfo({ productid: "   " }),
+      withInfo({ productid: "bad\\nid" }),
+      withInfo({ productid: "https://intui.travel/order" }),
+      withInfo({ productid: "x".repeat(257) }),
+    ];
+    expect(normalizeIntuiOffers(body(invalid), query, context).offers).toHaveLength(0);
   });
 
   it("rejects bad, ambiguous, fractional-cent and currency-mismatched prices", () => {
