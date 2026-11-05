@@ -1,4 +1,4 @@
-name: One-shot Intui read-only diagnostic
+name: One-shot Intui response shape diagnostic
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   intui-diagnostic:
     if: >-
-      github.event.label.name == 'enhancement' &&
+      github.event.label.name == 'documentation' &&
       github.event.pull_request.number == 1 &&
       github.event.pull_request.head.ref == 'feature/intui-api-safe-2026-11-05' &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -22,8 +22,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Exactly one read-only Intui GetAvailCar request
+      - name: One read-only Intui JSON shape request
         env:
           INTUI_API_KEY: ${{ secrets.INTUI_API_KEY }}
-          INTUI_DIAGNOSTIC_ALLOWED: "yes"
-        run: node scripts/intui-read-only-check.mjs
+          INTUI_DIAGNOSTIC_ALLOWED: "shape-20261105"
+        run: node scripts/intui-response-shape-check.mjs
