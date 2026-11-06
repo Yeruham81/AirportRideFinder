@@ -80,7 +80,7 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     });
     fireEvent.change(screen.getByLabelText("Adults"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Currency"), { target: { value: "GBP" } });
-    fireEvent.change(screen.getByLabelText("Suitcases"), { target: { value: "5" } });
+    expect(screen.queryByLabelText("Suitcases")).toBeNull();
     fireEvent.change(screen.getByLabelText("Ski / snowboard bags"), { target: { value: "2" } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -97,7 +97,7 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     expect(Object.fromEntries(["from", "to", "date", "time", "adults", "luggage", "ski_bags", "currency"]
       .map(k => [k, q.searchParams.get(k)]))).toEqual({
       from: "airport-2", to: "resort-168", date: "2031-01-20",
-      time: "10:15", adults: "4", luggage: "5", ski_bags: "2", currency: "GBP",
+      time: "10:15", adults: "4", luggage: "0", ski_bags: "2", currency: "GBP",
     });
     expect(q.searchParams.has("promo")).toBe(false);
     expect(q.searchParams.has("pc")).toBe(false);
@@ -128,43 +128,64 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("automatically changes 3 unquoted ski bags to 0, shows prices immediately and warns clearly", async () => {
-    const fetchMock = catalogFetchMock(async url => Response.json(quoteResponse(
-      url, new URL(url).searchParams.get("ski_bags") === "3" ? 0 : undefined,
-    )));
+  it("shows only the season-appropriate baggage selector and confirms one consistent summer quote", async () => {
+    const fetchMock = catalogFetchMock(async url => Response.json(quoteResponse(url)));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AlpsPublicQuotePanel />);
+    await screen.findByText(/2 active supplier routes loaded/);
+    fireEvent.change(screen.getByLabelText("Pickup date (Alpine local)"), {
+      target: { value: "2027-04-30" },
+    });
+    expect(screen.getByLabelText("Ski / snowboard bags")).toBeTruthy();
+    expect(screen.queryByLabelText("Suitcases")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Pickup date (Alpine local)"), {
+      target: { value: "2027-05-01" },
+    });
+    expect(screen.getByLabelText("Suitcases")).toBeTruthy();
+    expect(screen.queryByLabelText("Ski / snowboard bags")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Adults"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Suitcases"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search live public prices (no key)" }));
+    await screen.findByText("Public quote API connection successful.");
+    expect(screen.getByText("Alpine XL van")).toBeTruthy();
+    expect(screen.getByText(/3 suitcases and 0 ski bags/)).toBeTruthy();
+    expect(screen.queryByText(/excluded:/i)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const url = new URL(fetchMock.mock.calls[1]![0]);
+    expect(Object.fromEntries(["adults", "luggage", "ski_bags"]
+      .map(k => [k, url.searchParams.get(k)]))).toEqual({
+      adults: "3", luggage: "3", ski_bags: "0",
+    });
+    expect(screen.queryByRole("link", { name: /book|checkout/i })).toBeNull();
+  });
+
+  it("automatically shows genuine prices when provider unexpectedly drops requested suitcases", async () => {
+    const fetchMock = catalogFetchMock(async url => {
+      const body = quoteResponse(url);
+      return Response.json({
+        ...body, outbound: {
+          ...body.outbound,
+          luggage: { normal_suitcases: 0, ski_bags: 0 },
+        },
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
     render(<AlpsPublicQuotePanel />);
     await screen.findByText(/2 active supplier routes loaded/);
     fireEvent.change(screen.getByLabelText("Pickup date (Alpine local)"), {
       target: { value: "2027-07-22" },
     });
-    fireEvent.change(screen.getByLabelText("Adults"), {
-      target: { value: "3" },
-    });
-    fireEvent.change(screen.getByLabelText("Suitcases"), {
-      target: { value: "3" },
-    });
-    fireEvent.change(screen.getByLabelText("Ski / snowboard bags"), {
-      target: { value: "3" },
-    });
+    fireEvent.change(screen.getByLabelText("Suitcases"), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: "Search live public prices (no key)" }));
-
     await screen.findByText("Public quote API connection successful.");
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Suitcases excluded");
+    expect(alert.textContent).toContain("quoted 0 of the 3 requested");
     expect(screen.getByText("Alpine XL van")).toBeTruthy();
-    const note = screen.getByRole("alert");
-    expect(note.textContent).toContain("Ski bags excluded:");
-    expect(note.textContent).toContain("Alps2Alps quoted 0 of the 3 requested.");
-    expect(note.textContent).toContain("Prices exclude ski bags;");
-    expect(note.textContent).toContain("confirm transport and any extra fees with the provider.");
-    expect(note.textContent).not.toContain("search field has been adjusted");
-    expect((screen.getByLabelText("Ski / snowboard bags") as HTMLSelectElement).value).toBe("0");
-    expect(screen.getByText(/3 suitcases and 0 ski bags/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Change ski bags to 0" })).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(2); // One catalog and ONE quote; no second price search.
-    const quoteUrl = new URL(fetchMock.mock.calls[1]![0]);
-    expect(quoteUrl.searchParams.get("ski_bags")).toBe("3");
-    expect(quoteUrl.searchParams.get("luggage")).toBe("3");
-    expect(quoteUrl.searchParams.get("adults")).toBe("3");
-    expect(screen.queryByRole("link", { name: /book|deal|checkout/i })).toBeNull();
+    expect((screen.getByLabelText("Suitcases") as HTMLSelectElement).value).toBe("0");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("link", { name: /book|checkout/i })).toBeNull();
   });
+
 });
