@@ -46,7 +46,7 @@ async function requestJson(
     const response = await options.fetchImpl(ALPS_SANDBOX_BASE + endpoint.path, {
       method: endpoint.method,
       headers,
-      body: endpoint.method === "POST" ? JSON.stringify(options.body) : undefined,
+      ...(endpoint.method === "POST" ? { body: JSON.stringify(options.body) } : {}),
       redirect: "manual", // Cloudflare-compatible: never forward credentials.
       signal: controller.signal,
     });
