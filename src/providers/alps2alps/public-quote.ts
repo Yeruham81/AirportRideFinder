@@ -182,7 +182,7 @@ export function parseAlpsRouteCatalog(body: unknown): AlpsRouteCatalog | null {
     const resortName = safeLabel(row["resort_name"]);
     if (typeof station !== "string" || !validAlpsLocationCode(station) ||
       !/^(airport|train_station|city)-/.test(station) ||
-      typeof resort !== "string" || !/^resort-[1-9]\\d{0,7}$/.test(resort) ||
+      typeof resort !== "string" || !/^resort-[1-9]\d{0,7}$/.test(resort) ||
       !stationName || !resortName) continue;
     places.set(station, {
       code: station, name: stationName, type: typeFromCode(station),
@@ -215,12 +215,12 @@ export function suggestAlpsCatalogLocations(
   connectedTo?: string | null,
   maxResults = 16,
 ): AlpsPublicLocation[] {
-  const q = term.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+  const q = term.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!q || q.length > 80) return [];
   return catalog.locations
     .filter(location =>
       (!connectedTo || alpsCatalogAllowsPair(catalog, connectedTo, location.code)) &&
-      location.name.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().includes(q))
+      location.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q))
     .sort((a, b) => {
       const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1;
       const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1;
