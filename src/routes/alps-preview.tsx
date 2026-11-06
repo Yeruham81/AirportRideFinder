@@ -20,7 +20,7 @@ export const Route = createFileRoute("/alps-preview")({
   component: AlpsSandboxPreview,
 });
 
-type QuoteResult = Awaited<ReturnType<typeof searchAlpsSandbox>>;
+type QuoteResult = Awaited<ReturnType<typeof searchAlpsSandbox>> | { kind: "request_failed" };
 
 function AlpsSandboxPreview() {
   const router = useRouter();
@@ -68,7 +68,7 @@ function AlpsSandboxPreview() {
     try {
       setQuote(await searchAlpsSandbox({ data: { date, time, passengers } }));
     } catch {
-      setQuote({ kind: "error", code: "request_failed" });
+      setQuote({ kind: "request_failed" });
     } finally { setQuotePending(false); }
   }
 
@@ -231,10 +231,10 @@ function AlpsSandboxPreview() {
               Preview session expired. Lock the page and sign in again.
             </div>
           )}
-          {quote?.kind === "error" && (
+          {(quote?.kind === "error" || quote?.kind === "request_failed") && (
             <div role="alert" className="rounded-xl border bg-card p-4 text-sm">
               Sandbox API request could not be completed. Diagnostic code:{" "}
-              <code>{quote.code}</code>. No credentials or provider payloads are shown.
+              <code>{quote.kind === "request_failed" ? "request_failed" : quote.code}</code>. No credentials or provider payloads are shown.
             </div>
           )}
           {(quote?.kind === "disabled" || quote?.kind === "unconfigured") && (
