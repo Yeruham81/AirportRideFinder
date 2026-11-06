@@ -89,6 +89,49 @@ compatibility; do not rotate working secrets without evidence. If the failure
 occurs only on transfer, investigate endpoint-specific access policies.
 Do not copy private credentials, raw request/response bodies or bearer tokens.
 
+## Public GET quote fallback (private diagnostic only)
+
+We verified on 6 Nov 2026, using **no secrets** and a separate GitHub
+Actions runner, that:
+- `POST https://sandbox.amitours.com/api/v2/token` with intentionally invalid
+  dummy credentials returned HTTP **400** with successful TLS (no transport
+  error). This establishes that the endpoint is reachable from the GitHub
+  runner, **not** from the Lovable/Cloudflare runtime.
+- `GET https://booking.alps2alps.com/api/public/v1/transfer-options` returned
+  HTTP **200** for Geneva Airport (`airport-1`) -> Chamonix (`resort-11`).
+  Actual JSON contained currency EUR, expected route/pickup/adult fields,
+  luggage fields and three `requested` vehicle offers. **No booking was
+  created.**
+- The temporary GitHub Actions connectivity workflow was removed before
+  merging; no API credentials were ever included in the workflow.
+
+Because the provider documents `Access-Control-Allow-Origin: *` for the
+keyless public endpoint and a stateless GET quote-only flow, an **independent
+private browser-side test** is now available on the existing authenticated
+`/alps-preview` route: **Test public quote (no key)**. This does not try to
+work around API access controls: it uses the official public endpoint expressly
+documented for browser calling. It is user-initiated, supports only the fixed
+Geneva -> Chamonix route, and uses the currently chosen local pickup date/time
+and adults, with explicitly selected suitcase count and zero ski bags.
+The GET request is non-booking and uses no API credentials, promo or affiliate
+tracking fields. The returned quote and booking URLs are intentionally ignored;
+the UI renders only validated route-correct prices, capacity, actual pickup
+time and provider-echoed luggage.
+
+**The Public API returns real public quotes, unlike the B2B sandbox.** The UI
+labels them clearly as private test-only, not public site offers, and warns that
+retail pricing, permission to compare offers and affiliate commission attribution
+still need verification with Laura. Do not copy these prices into the four-provider
+fictional demo or use them for a public comparison engine yet. The protected
+preview still needs hosting-side Access/WAF and shared limiter before wider access.
+Avoid repeated searches; the public API imposes its own rate limits.
+
+If the public browser test works while hosted B2B POST /token fails, that is
+consistent with an origin/Cloudflare egress-specific problem rather than a
+global Alps2Alps outage. To isolate B2B network failure further, hosting
+logs or provider network allowlisting may be needed. **Do not rotate API
+secrets solely because a fetch failed.**
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,
