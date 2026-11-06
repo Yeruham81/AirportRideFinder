@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { ArrowLeftRight, CarFront, Luggage, MapPin, Search, UsersRound, Wifi } from "lucide-react";
 import { formatMoney } from "@/domain/money";
-import { defaultPickupDate } from "@/domain/time";
+import { defaultPickupDate, todayInTimeZone } from "@/domain/time";
 import {
   ALPS_INITIAL_FROM, ALPS_INITIAL_TO,
   fetchAlpsLocations, fetchAlpsPublicQuote,
@@ -232,7 +232,7 @@ export function AlpsPublicQuotePanel() {
           <label className="block text-sm font-semibold">
             Pickup date (Alpine local)
             <input type="date" required value={date}
-              min={defaultPickupDate("Europe/Zurich", new Date(Date.now() - 6 * 86400000))}
+              min={todayInTimeZone("Europe/Zurich")}
               onChange={(event) => { invalidate(); setDate(event.target.value); }}
               className={inputClass} />
           </label>
