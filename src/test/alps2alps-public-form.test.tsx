@@ -128,9 +128,9 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("names the seasonal ski-bag mismatch and offers an explicit correction without a booking", async () => {
+  it("automatically changes 3 unquoted ski bags to 0, shows prices immediately and warns clearly", async () => {
     const fetchMock = catalogFetchMock(async url => Response.json(quoteResponse(
-      url, new URL(url).searchParams.get("ski_bags") === "2" ? 0 : undefined,
+      url, new URL(url).searchParams.get("ski_bags") === "3" ? 0 : undefined,
     )));
     vi.stubGlobal("fetch", fetchMock);
     render(<AlpsPublicQuotePanel />);
@@ -138,17 +138,31 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     fireEvent.change(screen.getByLabelText("Pickup date (Alpine local)"), {
       target: { value: "2027-07-22" },
     });
+    fireEvent.change(screen.getByLabelText("Adults"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByLabelText("Suitcases"), {
+      target: { value: "3" },
+    });
     fireEvent.change(screen.getByLabelText("Ski / snowboard bags"), {
-      target: { value: "2" },
+      target: { value: "3" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search live public prices (no key)" }));
-    await screen.findByText(/The provider did not quote the requested ski\/snowboard bag count/);
-    expect(screen.queryByText("Alpine XL van")).toBeNull();
-    expect(screen.getByText(/Requested: 2; returned by provider: 0/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Change ski bags to 0" }));
-    expect((screen.getByLabelText("Ski / snowboard bags") as HTMLSelectElement).value).toBe("0");
-    fireEvent.click(screen.getByRole("button", { name: "Search live public prices (no key)" }));
+
     await screen.findByText("Public quote API connection successful.");
-    expect(fetchMock).toHaveBeenCalledTimes(3); // catalog + two quotes, no checkout
+    expect(screen.getByText("Alpine XL van")).toBeTruthy();
+    const note = screen.getByRole("alert");
+    expect(note.textContent).toContain("You requested 3 ski/snowboard bags");
+    expect(note.textContent).toContain("Prices below are for 0 ski bags only");
+    expect(note.textContent).toContain("confirm acceptance and any additional charges");
+    expect((screen.getByLabelText("Ski / snowboard bags") as HTMLSelectElement).value).toBe("0");
+    expect(screen.getByText(/3 suitcases and 0 ski bags/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Change ski bags to 0" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2); // One catalog and ONE quote; no second price search.
+    const quoteUrl = new URL(fetchMock.mock.calls[1]![0]);
+    expect(quoteUrl.searchParams.get("ski_bags")).toBe("3");
+    expect(quoteUrl.searchParams.get("luggage")).toBe("3");
+    expect(quoteUrl.searchParams.get("adults")).toBe("3");
+    expect(screen.queryByRole("link", { name: /book|deal|checkout/i })).toBeNull();
   });
 });
