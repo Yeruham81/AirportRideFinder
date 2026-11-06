@@ -12,8 +12,7 @@ jobs:
         shell: bash
         run: |
           echo "B2B sandbox token endpoint, bogus credentials, expected HTTP error (not network failure)"
-          curl -sS --max-time 15 --connect-timeout 7 --location-trusted=false \
-            -X POST 'https://sandbox.amitours.com/api/v2/token' \
+          curl -sS --max-time 15 --connect-timeout 7             -X POST 'https://sandbox.amitours.com/api/v2/token' \
             -H 'Content-Type: application/json' \
             --data '{"api_key":"nonexistent-test-only","api_secret":"invalid-test-only"}' \
             -o /dev/null -w "B2B POST HTTP status: %{http_code}; curl exit: %{exitcode}; TLS verify: %{ssl_verify_result}\n" || true
