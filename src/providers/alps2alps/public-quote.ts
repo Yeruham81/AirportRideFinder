@@ -59,7 +59,7 @@ export type AlpsPublicQuoteResult =
     };
 
 export type AlpsLocationSearchResult =
-  | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" }
+  | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "route_unavailable" }
   | { status: "http_error"; httpStatus: number }
   | { status: "ok"; locations: AlpsPublicLocation[] };
 
@@ -282,7 +282,6 @@ export async function fetchAlpsLocations(
   try { url = buildAlpsLocationSearchUrl(term); }
   catch { return { status: "invalid" }; }
   const response = await publicJson(url, options.fetchImpl ?? fetch, options.timeoutMs ?? 10000);
-  if (response.status === "route_unavailable") return { status: "http_error", httpStatus: 404 };
   if (response.status !== "ok") return response;
   const locations = parseAlpsLocations(response.body);
   return locations ? { status: "ok", locations } : { status: "malformed_response" };
