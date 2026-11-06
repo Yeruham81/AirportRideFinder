@@ -31,6 +31,10 @@ jobs:
                 print("routes_top_level", type(j).__name__, "count",len(j) if isinstance(j,list) else len(j.keys()) if isinstance(j,dict) else None)
                 if isinstance(j,dict): print("routes_keys", list(j)[:12])
                 if isinstance(j,list) and j: print("routes_first_keys",sorted(j[0]) if isinstance(j[0],dict) else type(j[0]).__name__, "first_types",{k:type(v).__name__ for k,v in j[0].items()} if isinstance(j[0],dict) else {})
+                if isinstance(j,list):
+                  print("routes_first_examples",[{k:v.get(k) for k in ("station","station_name","resort","resort_name","is_active")} for v in j[:3]])
+                  print("routes_active_count",sum(1 for v in j if isinstance(v,dict) and v.get("is_active") in (1,True)))
+                  print("routes_all_code_types", sorted(set(str(v.get("station","")).split("-")[0] for v in j if isinstance(v,dict))))
               if title == "catalog":
                 print("catalog_top_level", type(j).__name__, "count",len(j) if isinstance(j,list) else len(j.keys()) if isinstance(j,dict) else None)
                 if isinstance(j,dict): print("catalog_keys", list(j)[:12])
