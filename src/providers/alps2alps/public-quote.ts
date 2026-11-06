@@ -19,6 +19,17 @@ export const ALPS_INITIAL_TO = {
   code: "resort-11", name: "Chamonix", type: "resort", country: "France",
 } as const;
 
+/**
+ * Observed supplier-season heuristic, NOT a published contractual cutoff.
+ * Verified for 2026-11-13, 2026-12-01, 2027-04-30 and 2027-05-01.
+ * We still validate provider-echoed baggage and explicitly warn if it differs.
+ */
+export function alpsSeasonalBagMode(date: string): "winter" | "summer" | null {
+  if (!isValidDateString(date)) return null;
+  const month = Number(date.slice(5, 7));
+  return month === 12 || month <= 4 ? "winter" : "summer";
+}
+
 export type AlpsPublicCurrency = "EUR" | "GBP" | "USD";
 export interface AlpsPublicLocation {
   code: string;
@@ -60,6 +71,11 @@ export type AlpsPublicQuoteResult =
       bagAdjustment?: {
         requestedSkiBags: number;
         quotedSkiBags: 0;
+      };
+      /** Supplier did not quote the requested standard suitcases (often winter mode). */
+      suitcaseAdjustment?: {
+        requestedSuitcases: number;
+        quotedSuitcases: 0;
       };
       route: { from: string; to: string };
       /** Diagnostics only. Never expose or launch vendor-provided checkout URLs. */
@@ -292,7 +308,12 @@ export function parseAlpsPublicQuote(
   // Summer ski bags are silently ignored by the provider. We never label this
   // as a valid quote for a different baggage configuration.
   if (luggage === null || skiBags === null) return { status: "malformed_response" };
-  if (luggage !== query.luggage)
+  // Symmetric safeguard: winter can ignore suitcases entirely. Show only
+  // the quote for zero suitcases with a prominent exclusion warning.
+  const adjustedSuitcases = query.luggage > 0 && luggage === 0
+    ? { requestedSuitcases: query.luggage, quotedSuitcases: 0 as const }
+    : undefined;
+  if (luggage !== query.luggage && !adjustedSuitcases)
     return { status: "quote_mismatch", field: "suitcases", requested: query.luggage, quoted: luggage };
   // Some supplier searches (confirmed in summer) ignore requested ski bags
   // and quote zero. We may show the ALREADY RETURNED zero-bag quote without a
@@ -340,6 +361,7 @@ export function parseAlpsPublicQuote(
     luggage,
     skiBags,
     ...(adjustedSkiBags ? { bagAdjustment: adjustedSkiBags } : {}),
+    ...(adjustedSuitcases ? { suitcaseAdjustment: adjustedSuitcases } : {}),
     route: { from: fromName, to: toName },
     linkEvidence: {
       quoteUrlPresent: safeVendorUrl(root["quote_url"], "quote", query),

@@ -247,6 +247,49 @@ were used. The temporary probe workflow was removed after testing.
 Supplier reference:
 https://www.alps2alps.com/developers/public-api/#seasonal-extras-luggage-vs-skis
 
+## Season-aware one-field baggage search (6 Nov 2026)
+
+Read-only public quote probes for Geneva Airport → Chamonix, **3 adults,
+3 ordinary suitcases and 3 ski bags** returned the following provider-echoed
+baggage counts:
+
+| Pickup date | Suitcases quoted | Ski bags quoted |
+| --- | ---: | ---: |
+| 13 Nov 2026 | 3 | 0 |
+| 1 and 15 Dec 2026 | 0 | 3 |
+| 31 Mar, 1/15/30 Apr 2027 | 0 | 3 |
+| 1/15 May, 31 Oct, 1 Nov 2027 | 3 | 0 |
+
+These observations **suggest** winter baggage mode runs **1 December–
+30 April**, and summer mode **1 May–30 November**. These calendar cutovers
+are **not published or contractually guaranteed** in the provider's API
+documentation, which merely confirms the seasonal modes. The probe hit HTTP
+429 on the twelfth request (1 Dec 2027); we stopped on rate limit and removed
+the temporary read-only GitHub workflow.
+
+To minimize quote mismatches, the private quote form now displays just
+**ski/snowboard bags in winter** and **suitcases in summer**. The inactive
+baggage count is explicitly sent as **0** and never suggested as being
+included in the result. On a pickup-date change the relevant input changes
+without a second price request. The two stored input values are independent.
+The parser still verifies the exact returned route, passengers, pickup,
+currency and baggage. If the provider unexpectedly drops a positive bag
+count to **0**, either baggage type is normalized to the already-returned
+zero-bag quote with a concise exclusion warning rather than another GET.
+Other mismatches still fail closed. This maintains real price fidelity and
+avoids unwanted requests that may trigger 429.
+
+**Important unresolved operational question:** During the winter the API
+echoed **0 ordinary suitcases** even though 3 were sent together with
+3 ski bags; in the summer the same request echoed **0 ski bags**.
+This establishes the **public API basket** does not currently confirm both
+types together, **not** that the transfer driver would refuse to transport
+them. Laura must confirm whether both can physically travel together,
+capacity/extra charges, how to represent such a booking and whether the
+observed cutover dates are official and stable year to year.
+Do not represent the quoted price as including the unconfirmed baggage.
+No public checkout, affiliate link or payment action has been enabled.
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,
@@ -259,6 +302,11 @@ https://www.alps2alps.com/developers/public-api/#seasonal-extras-luggage-vs-skis
 5. Are any caching, price validity or refresh requirements imposed?
 6. Which API (keyless public quotes or authenticated B2B v2) is supported
    for a search-and-redirect rather than a booking-management workflow?
+7. Does the API have fixed season boundaries (observed Dec 1 and May 1),
+   and can guests bring both standard suitcases and ski/snowboard bags?
+   The current public API confirms only the seasonal baggage type even when
+   both counts are explicitly supplied; how should we quote/display these
+   journeys and any additional carriage charges?
 
 Do not send questions separately yet; collect further findings first.
 
