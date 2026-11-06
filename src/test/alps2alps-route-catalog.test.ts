@@ -62,7 +62,9 @@ describe("Alps2Alps official active route autocomplete catalog", () => {
     expect(alpsCatalogAllowsPair(catalog, "airport-2", "resort-11")).toBe(false);
     expect(suggestAlpsCatalogLocations(catalog, "G", "resort-11").map(x => x.name))
       .toEqual(["Geneva Airport"]);
-    expect(suggestAlpsCatalogLocations(catalog, "I", "airport-1")).toEqual([]);
+    // "i" is a substring of Chamonix; active-pair filter excludes Ischgl.
+    expect(suggestAlpsCatalogLocations(catalog, "I", "airport-1").map(x => x.name))
+      .toEqual(["Chamonix"]);
     expect(suggestAlpsCatalogLocations(catalog, "Is", "airport-2").map(x => x.name))
       .toEqual(["Ischgl"]);
   });
