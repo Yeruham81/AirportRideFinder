@@ -31,5 +31,14 @@
 - [ ] Perform protected end-to-end browser preview with the real Intui data, before enabling public comparison
 - [ ] Public comparison and redirects — not started. Requires provider tracking/affiliate attribution and safe live-mode UX; no booking/payment integration.
 
+## Alps2Alps / Amitours — initial B2B v2 sandbox evaluation
+- [x] Server-only, allowlisted sandbox token, vehicle catalog and private-transfer quote client
+- [x] Separate noindex /alps-preview behind an existing strong preview password, independent signed cookie and bounded quotas
+- [x] User-triggered Geneva → Chamonix sandbox-only price preview with explicit non-booking disclaimer
+- [x] Mock-only unit tests for price normalization, fail-closed API transport and zero unintended bookings
+- [ ] Enable ALPS2ALPS_SANDBOX_PREVIEW_ENABLED=true in hosting secrets and verify real sandbox authentication and quote shape
+- [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
+- [ ] Production access and tracked redirects — not started
+
 ## Later (needs approval)
 - Phase 2B+ — not started
