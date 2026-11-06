@@ -84,7 +84,7 @@ describe("Alps2Alps official dynamic public location lookup", () => {
   });
 
   it("makes only one GET search after manual invocation and gracefully reports rate limits", async () => {
-    const f = vi.fn(async () => Response.json([
+    const f = vi.fn(async (_url: string) => Response.json([
       { code: "airport-1", name: "Geneva Airport", type: "airport", country: "Switzerland" },
     ]));
     const r = await fetchAlpsLocations("gen", { fetchImpl: f as unknown as typeof fetch });
