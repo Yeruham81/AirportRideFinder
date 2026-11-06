@@ -9,6 +9,8 @@ import { isValidDateString, isValidTimeString, isPastPickup } from "@/domain/tim
 const PUBLIC_BASE = "https://booking.alps2alps.com/api/public/v1";
 export const ALPS_PUBLIC_QUOTE_ENDPOINT = `${PUBLIC_BASE}/transfer-options` as const;
 export const ALPS_PUBLIC_LOCATIONS_ENDPOINT = `${PUBLIC_BASE}/locations/search` as const;
+/** Official read-only partner resource from the Alps2Alps onboarding email. */
+export const ALPS_PUBLIC_ROUTE_CATALOG_ENDPOINT = "https://booking.alps2alps.com/api/resource/routes" as const;
 
 export const ALPS_INITIAL_FROM = {
   code: "airport-1", name: "Geneva Airport", type: "airport", country: "Switzerland",
@@ -47,6 +49,7 @@ export interface AlpsPublicOffer {
 export type AlpsPublicQuoteResult =
   | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "no_offers" | "route_unavailable" }
   | { status: "http_error"; httpStatus: number }
+  | { status: "quote_mismatch"; field: AlpsQuoteMismatchField; requested?: number; quoted?: number }
   | {
       status: "ok";
       offers: AlpsPublicOffer[];
@@ -62,6 +65,23 @@ export type AlpsLocationSearchResult =
   | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "route_unavailable" }
   | { status: "http_error"; httpStatus: number }
   | { status: "ok"; locations: AlpsPublicLocation[] };
+
+export interface AlpsRouteCatalog {
+  /** Active supplier route endpoints only (airports / stations / cities and resorts). */
+  locations: AlpsPublicLocation[];
+  /** Bidirectional station–resort pairs from active vendor routes. */
+  pairs: ReadonlySet<string>;
+  activeRouteCount: number;
+}
+export type AlpsRouteCatalogResult =
+  | { status: "ok"; catalog: AlpsRouteCatalog }
+  | { status: "timeout" | "network_error" | "rate_limited" | "malformed_response" | "route_unavailable" }
+  | { status: "http_error"; httpStatus: number };
+
+export type AlpsQuoteMismatchField =
+  | "route" | "currency" | "passengers" | "pickup_time" |
+    "suitcases" | "ski_bags";
+
 
 const CODE = /^(?:airport|resort|city|train_station)-[1-9]\d{0,7}(?:-[a-z])?$/;
 const MAX_BODY = 1_000_000;
@@ -146,6 +166,71 @@ export function parseAlpsLocations(body: unknown): AlpsPublicLocation[] | null {
   return found.slice(0, 35);
 }
 
+/** The list is read from live supplier resource data, not a hand-maintained city list. */
+export function parseAlpsRouteCatalog(body: unknown): AlpsRouteCatalog | null {
+  if (!Array.isArray(body) || !body.length || body.length > 10000) return null;
+  const places = new Map<string, AlpsPublicLocation>();
+  const pairs = new Set<string>();
+  const typeFromCode = (code: string): AlpsPublicLocation["type"] =>
+    code.slice(0, code.lastIndexOf("-")) as AlpsPublicLocation["type"];
+  for (const raw of body) {
+    const row = record(raw);
+    if (!row || (row["is_active"] !== 1 && row["is_active"] !== true)) continue;
+    const station = row["station"];
+    const resort = row["resort"];
+    const stationName = safeLabel(row["station_name"]);
+    const resortName = safeLabel(row["resort_name"]);
+    if (typeof station !== "string" || !validAlpsLocationCode(station) ||
+      !/^(airport|train_station|city)-/.test(station) ||
+      typeof resort !== "string" || !/^resort-[1-9]\\d{0,7}$/.test(resort) ||
+      !stationName || !resortName) continue;
+    places.set(station, {
+      code: station, name: stationName, type: typeFromCode(station),
+      country: "",
+    });
+    places.set(resort, {
+      code: resort, name: resortName, type: "resort", country: "",
+    });
+    pairs.add([station, resort].sort().join("|"));
+  }
+  if (!pairs.size || !places.size) return null;
+  return {
+    locations: [...places.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "en") || a.code.localeCompare(b.code)),
+    pairs,
+    activeRouteCount: pairs.size,
+  };
+}
+
+export function alpsCatalogAllowsPair(
+  catalog: AlpsRouteCatalog, a: string, b: string,
+): boolean {
+  return catalog.pairs.has([a, b].sort().join("|"));
+}
+
+/** Fuzzy substring suggestions, ranked prefix-first; never fabricate identifiers. */
+export function suggestAlpsCatalogLocations(
+  catalog: AlpsRouteCatalog,
+  term: string,
+  connectedTo?: string | null,
+  maxResults = 16,
+): AlpsPublicLocation[] {
+  const q = term.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+  if (!q || q.length > 80) return [];
+  return catalog.locations
+    .filter(location =>
+      (!connectedTo || alpsCatalogAllowsPair(catalog, connectedTo, location.code)) &&
+      location.name.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().includes(q))
+    .sort((a, b) => {
+      const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStart - bStart ||
+        (a.type === "airport" ? 0 : 1) - (b.type === "airport" ? 0 : 1) ||
+        a.name.localeCompare(b.name, "en");
+    })
+    .slice(0, Math.max(1, Math.min(maxResults, 50)));
+}
+
 export function buildAlpsLocationSearchUrl(term: string): string {
   const q = term.trim();
   if (q.length < 2 || q.length > 80 || /[\x00-\x1F\x7F]/.test(q)) {
@@ -188,18 +273,24 @@ export function parseAlpsPublicQuote(
   const fromName = safeLabel(route?.["from"]);
   const toName = safeLabel(route?.["to"]);
   if (!root || !route || !outbound || !passengers || !fromName || !toName ||
-    root["currency"] !== query.currency ||
-    route["from_code"] !== query.from || route["to_code"] !== query.to ||
-    passengers["adults"] !== query.passengers ||
     !Array.isArray(outbound["vehicles"])) return { status: "malformed_response" };
+  if (root["currency"] !== query.currency) return { status: "quote_mismatch", field: "currency" };
+  if (route["from_code"] !== query.from || route["to_code"] !== query.to)
+    return { status: "quote_mismatch", field: "route" };
+  if (passengers["adults"] !== query.passengers)
+    return { status: "quote_mismatch", field: "passengers" };
   const pickup = outbound["pick_up_date_time"];
-  if (pickup !== `${query.date} ${query.time}:00`) return { status: "malformed_response" };
+  if (pickup !== `${query.date} ${query.time}:00`)
+    return { status: "quote_mismatch", field: "pickup_time" };
   const luggage = within(extras?.["normal_suitcases"]);
   const skiBags = within(extras?.["ski_bags"]);
-  // No silent default changes: ensure the quoted extras match the chosen inputs.
-  if (luggage !== query.luggage || skiBags !== query.skiBags) {
-    return { status: "malformed_response" };
-  }
+  // Summer ski bags are silently ignored by the provider. We never label this
+  // as a valid quote for a different baggage configuration.
+  if (luggage === null || skiBags === null) return { status: "malformed_response" };
+  if (luggage !== query.luggage)
+    return { status: "quote_mismatch", field: "suitcases", requested: query.luggage, quoted: luggage };
+  if (skiBags !== query.skiBags)
+    return { status: "quote_mismatch", field: "ski_bags", requested: query.skiBags, quoted: skiBags };
 
   const offers: AlpsPublicOffer[] = [];
   let vehicleUrlsPresent = 0;
@@ -296,4 +387,18 @@ export async function fetchAlpsPublicQuote(
     buildAlpsPublicQuoteUrl(query), options.fetchImpl ?? fetch, options.timeoutMs ?? 12000,
   );
   return response.status === "ok" ? parseAlpsPublicQuote(response.body, query) : response;
+}
+
+/** One catalog GET per private page mount; no typed-query network calls needed. */
+export async function fetchAlpsRouteCatalog(
+  options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<AlpsRouteCatalogResult> {
+  const response = await publicJson(
+    ALPS_PUBLIC_ROUTE_CATALOG_ENDPOINT,
+    options.fetchImpl ?? fetch,
+    options.timeoutMs ?? 14000,
+  );
+  if (response.status !== "ok") return response;
+  const catalog = parseAlpsRouteCatalog(response.body);
+  return catalog ? { status: "ok", catalog } : { status: "malformed_response" };
 }
