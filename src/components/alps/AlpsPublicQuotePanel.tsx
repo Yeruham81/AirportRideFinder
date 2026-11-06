@@ -5,7 +5,7 @@ import { AlpsLocationAutocomplete } from "./AlpsLocationAutocomplete";
 import { defaultPickupDate, todayInTimeZone } from "@/domain/time";
 import {
   ALPS_INITIAL_FROM, ALPS_INITIAL_TO,
-  alpsCatalogAllowsPair, fetchAlpsRouteCatalog, fetchAlpsPublicQuote,
+  alpsCatalogAllowsPair, alpsSeasonalBagMode, fetchAlpsRouteCatalog, fetchAlpsPublicQuote,
   validateAlpsPublicQuery,
   type AlpsRouteCatalogResult,
   type AlpsPublicCurrency,
@@ -57,8 +57,9 @@ export function AlpsPublicQuotePanel() {
   const [time, setTime] = useState("14:00");
   const [passengers, setPassengers] = useState(2);
   const [luggage, setLuggage] = useState(2);
-  const [skiBags, setSkiBags] = useState(0);
+  const [skiBags, setSkiBags] = useState(2);
   const [currency, setCurrency] = useState<AlpsPublicCurrency>("EUR");
+  const bagMode = alpsSeasonalBagMode(date);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AlpsPublicQuoteResult | null>(null);
   const [completed, setCompleted] = useState<AlpsPublicQuoteQuery | null>(null);
@@ -95,7 +96,10 @@ export function AlpsPublicQuotePanel() {
     event.preventDefault();
     if (busy || !from || !to) return;
     const query: AlpsPublicQuoteQuery = {
-      from: from.code, to: to.code, date, time, passengers, luggage, skiBags, currency,
+      from: from.code, to: to.code, date, time, passengers,
+      luggage: bagMode === "winter" ? 0 : luggage,
+      skiBags: bagMode === "summer" ? 0 : skiBags,
+      currency,
     };
     if (!validateAlpsPublicQuery(query)) {
       setResult({ status: "invalid" });
@@ -108,11 +112,12 @@ export function AlpsPublicQuotePanel() {
     try {
       const answer = await fetchAlpsPublicQuote(query);
       if (request === sequence.current) {
-        if (answer.status === "ok" && answer.bagAdjustment) {
-          // Display the original supplier response immediately: no second GET,
-          // and never label a zero-ski-bag price as including the user's bags.
-          setSkiBags(0);
-          setCompleted({ ...query, skiBags: 0 });
+        if (answer.status === "ok") {
+          // Both seasonal categories use supplier-confirmed counts; never
+          // silently claim the ignored baggage type is part of this quote.
+          if (answer.bagAdjustment) setSkiBags(0);
+          if (answer.suitcaseAdjustment) setLuggage(0);
+          setCompleted({ ...query, luggage: answer.luggage, skiBags: answer.skiBags });
         } else {
           setCompleted(query);
         }
@@ -199,27 +204,34 @@ export function AlpsPublicQuotePanel() {
               <option value="USD">USD ($)</option>
             </select>
           </label>
-          <label className="block text-sm font-semibold">
-            Suitcases
-            <select value={luggage}
-              onChange={(event) => { invalidate(); setLuggage(Number(event.target.value)); }}
-              className={inputClass}>
-              {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Ski / snowboard bags
-            <select value={skiBags}
-              onChange={(event) => { invalidate(); setSkiBags(Number(event.target.value)); }}
-              className={inputClass}>
-              {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
+          {bagMode === "summer" && (
+            <label className="block text-sm font-semibold">
+              Suitcases
+              <select value={luggage}
+                onChange={(event) => { invalidate(); setLuggage(Number(event.target.value)); }}
+                className={inputClass}>
+                {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
+          {bagMode === "winter" && (
+            <label className="block text-sm font-semibold">
+              Ski / snowboard bags
+              <select value={skiBags}
+                onChange={(event) => { invalidate(); setSkiBags(Number(event.target.value)); }}
+                className={inputClass}>
+                {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Pickup time is interpreted literally (not as a flight arrival time).
           Children, return journeys and seats are not yet supported in this controlled test.
-          Alps2Alps applies seasonal baggage rules: ski bags are supported in winter but may be excluded in summer.
+          {bagMode === "winter"
+            ? "Winter quote (Dec–Apr): ski bags only. Standard suitcases are not included in the API basket."
+            : "Summer quote (May–Nov): suitcases only. Ski equipment is not included in the API basket."}
+          {" "}Travelling with both? Confirm carriage directly with Alps2Alps.
         </p>
         <button type="submit" disabled={busy || !from || !to || from.code === to.code ||
             (catalog?.status === "ok" && !alpsCatalogAllowsPair(catalog.catalog, from.code, to.code))}
@@ -235,6 +247,13 @@ export function AlpsPublicQuotePanel() {
               <strong>Ski bags excluded:</strong>{" "}
               Alps2Alps quoted 0 of the {result.bagAdjustment.requestedSkiBags} requested.
               Prices exclude ski bags; confirm transport and any extra fees with the provider.
+            </div>
+          )}
+          {result.suitcaseAdjustment && (
+            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <strong>Suitcases excluded:</strong>{" "}
+              Alps2Alps quoted 0 of the {result.suitcaseAdjustment.requestedSuitcases} requested.
+              Prices exclude suitcases; confirm transport and any extra fees with the provider.
             </div>
           )}
           <div role="status" className="rounded-lg border border-teal/20 bg-teal-soft/40 p-4 text-sm">
