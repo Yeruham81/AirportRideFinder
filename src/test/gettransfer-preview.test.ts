@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { getUnambiguousLocalInstant, buildGetTransferPreviewQuery } from "@/providers/gettransfer/preview-query";
+import { getUnambiguousLocalInstant, buildGetTransferPreviewQuery, visibleGetTransferSandboxQuotes } from "@/providers/gettransfer/preview-query";
 import { sandboxRouteInfo } from "@/providers/gettransfer/sandbox-client.server";
+import { parseRouteInfo } from "@/providers/gettransfer/route-info";
 
 describe("GetTransfer private preview input validation", () => {
   const now = new Date("2026-11-06T12:00:00Z");
@@ -77,5 +78,37 @@ describe("GetTransfer preview transport remains read only", () => {
     expect(new URL(url).pathname).toBe("/api/route_info");
     expect(options.method).toBe("GET");
     expect(url).not.toContain("test-only-not-a-real-token");
+  });
+});
+
+describe("GetTransfer preview shows only immediate sandbox prices", () => {
+  const diagnostics = parseRouteInfo({
+    data: {
+      success: true,
+      prices: {
+        economy: { book_now: "US$48", min: "US$19" },
+        business: { book_now: "US$95", min: "US$24" },
+        bus: { min: "US$77" },
+        business_van: { min: "US$29" },
+        comfort: { min: "US$22" },
+        bad_currency: { book_now: "€120", min: "US$45" },
+      },
+    },
+  }, "USD");
+
+  it("shows only Economy and Business and retains their real parsed price amounts", () => {
+    expect(diagnostics).not.toBeNull();
+    const quotes = visibleGetTransferSandboxQuotes(diagnostics!.prices);
+    expect(quotes.map((quote) => quote.type)).toEqual(["economy", "business"]);
+    expect(quotes.map((quote) => quote.price.minor)).toEqual([4800, 9500]);
+    expect(quotes[0]!.indicativeMin).toBe("US$19");
+    expect(quotes.every((quote) => quote.price.currency === "USD")).toBe(true);
+  });
+
+  it("hides indicative-only and unparseable prices; an empty set has no visible cards", () => {
+    const onlyIndicative = diagnostics!.prices.filter((price) =>
+      price.type !== "economy" && price.type !== "business");
+    expect(visibleGetTransferSandboxQuotes(onlyIndicative)).toEqual([]);
+    expect(visibleGetTransferSandboxQuotes([])).toEqual([]);
   });
 });
