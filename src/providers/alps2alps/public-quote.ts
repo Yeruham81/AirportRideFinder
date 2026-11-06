@@ -56,6 +56,11 @@ export type AlpsPublicQuoteResult =
       pickupTime: string;
       luggage: number;
       skiBags: number;
+      /** Supplier actually quoted zero ski bags; no requested bags are included. */
+      bagAdjustment?: {
+        requestedSkiBags: number;
+        quotedSkiBags: 0;
+      };
       route: { from: string; to: string };
       /** Diagnostics only. Never expose or launch vendor-provided checkout URLs. */
       linkEvidence: { quoteUrlPresent: boolean; vehicleUrlsPresent: number };
@@ -289,7 +294,14 @@ export function parseAlpsPublicQuote(
   if (luggage === null || skiBags === null) return { status: "malformed_response" };
   if (luggage !== query.luggage)
     return { status: "quote_mismatch", field: "suitcases", requested: query.luggage, quoted: luggage };
-  if (skiBags !== query.skiBags)
+  // Some supplier searches (confirmed in summer) ignore requested ski bags
+  // and quote zero. We may show the ALREADY RETURNED zero-bag quote without a
+  // second API request, but only with explicit disclosure and adjusted form
+  // state. Never imply that the original bags are included in that price.
+  const adjustedSkiBags = query.skiBags > 0 && skiBags === 0
+    ? { requestedSkiBags: query.skiBags, quotedSkiBags: 0 as const }
+    : undefined;
+  if (skiBags !== query.skiBags && !adjustedSkiBags)
     return { status: "quote_mismatch", field: "ski_bags", requested: query.skiBags, quoted: skiBags };
 
   const offers: AlpsPublicOffer[] = [];
@@ -327,6 +339,7 @@ export function parseAlpsPublicQuote(
     pickupTime: String(pickup),
     luggage,
     skiBags,
+    ...(adjustedSkiBags ? { bagAdjustment: adjustedSkiBags } : {}),
     route: { from: fromName, to: toName },
     linkEvidence: {
       quoteUrlPresent: safeVendorUrl(root["quote_url"], "quote", query),

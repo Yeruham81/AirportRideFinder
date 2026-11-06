@@ -108,8 +108,15 @@ export function AlpsPublicQuotePanel() {
     try {
       const answer = await fetchAlpsPublicQuote(query);
       if (request === sequence.current) {
+        if (answer.status === "ok" && answer.bagAdjustment) {
+          // Display the original supplier response immediately: no second GET,
+          // and never label a zero-ski-bag price as including the user's bags.
+          setSkiBags(0);
+          setCompleted({ ...query, skiBags: 0 });
+        } else {
+          setCompleted(query);
+        }
         setResult(answer);
-        setCompleted(query);
       }
     } catch {
       if (request === sequence.current) setResult({ status: "network_error" });
@@ -223,6 +230,17 @@ export function AlpsPublicQuotePanel() {
 
       {result?.status === "ok" && completed && (
         <div className="mt-6 space-y-3">
+          {result.bagAdjustment && (
+            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <strong>Ski bags were not included in the provider's quote.</strong>{" "}
+              You requested {result.bagAdjustment.requestedSkiBags} ski/snowboard{" "}
+              {result.bagAdjustment.requestedSkiBags === 1 ? "bag" : "bags"}, but
+              Alps2Alps quoted 0. Prices below are for <strong>0 ski bags only</strong>,
+              and the search field has been adjusted to 0 automatically.
+              If you need to travel with ski equipment, confirm acceptance and any
+              additional charges with Alps2Alps before relying on these prices.
+            </div>
+          )}
           <div role="status" className="rounded-lg border border-teal/20 bg-teal-soft/40 p-4 text-sm">
             <strong>Public quote API connection successful.</strong>{" "}
             {result.offers.length} live public {result.offers.length === 1 ? "price" : "prices"} for{" "}
@@ -291,12 +309,6 @@ export function AlpsPublicQuotePanel() {
               </span>
             )}
           {result.status === "http_error" ? ` (HTTP ${result.httpStatus})` : ""}
-          {result.status === "quote_mismatch" && result.field === "ski_bags" && (
-            <button type="button" onClick={() => { invalidate(); setSkiBags(0); }}
-              className="mt-2 block rounded-lg border border-input px-3 py-2 text-xs font-semibold text-primary">
-              Change ski bags to 0
-            </button>
-          )}
           <p className="mt-1 text-xs text-muted-foreground">
             No credentials, booking links, or raw provider payloads are shown.
           </p>

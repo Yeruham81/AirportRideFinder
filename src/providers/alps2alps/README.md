@@ -197,13 +197,20 @@ A temporary, credential-free workflow verified that the live public GET
 count and luggage for Geneva Airport → Chamonix. For a **July** departure,
 the supplier returned `ski_bags=0` after receiving a request for two ski
 bags: its documented summer policy ignores ski bags. Previously the strict
-parser reported a generic `malformed_response`. The updated parser now
-returns a non-sensitive `quote_mismatch` reason identifying which of route,
-currency, adult count, pickup time, suitcases or ski bags differed. When
-ski bags differ, the private UI shows both counts and an explicit
-**Change ski bags to 0** action. Prices remain hidden until the user
-re-requests a matching configuration. A truly malformed upstream JSON shape
-still returns `malformed_response`; we never invent a quote.
+parser reported a generic `malformed_response`. The updated parser reports a non-sensitive `quote_mismatch` reason
+identifying which of route, currency, adult count, pickup time, suitcases
+or ski bags differed. If the **only** mismatch is that the supplier quoted
+**zero ski bags** rather than the requested positive quantity, the same
+supplier-confirmed prices are immediately displayed for **zero ski bags**
+without an additional API request. The search field is reset to 0 and a
+conspicuous warning states how many ski bags were originally requested,
+that they are **not included in the displayed price**, and that the
+traveler must clarify acceptance and any charges with Alps2Alps.
+This does not imply that ski baggage is free, accepted, or included.
+Other ski-bag mismatches (for example requesting 3 and receiving 1),
+or mismatches in route, currency, passengers, pickup, or suitcases remain
+rejected and cannot be silently normalized. A truly malformed upstream
+JSON shape still returns `malformed_response`; we never invent a quote.
 
 The route catalog request is automatic **only after authentication**;
 the real price GET remains manual. Neither catalog nor search uses provider

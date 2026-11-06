@@ -43,6 +43,7 @@
 - [x] Validate provider booking-link structure as non-actionable metadata only; no deep-link navigation or commission claims.
 - [x] Replace manual location search button with first-character autocomplete backed by the supplier's verified active-route directory (4,316 active rows; 6 Nov 2026), with keyboard/mouse selection and active-pair filtering.
 - [x] Diagnose reported generic `malformed_response`: distinguish mismatched quote fields and explain supplier's summer policy of ignoring ski bags instead of presenting a different quote.
+- [x] Automatically show the already-returned provider zero-ski-bag prices if original search requested more: adjust input to 0 and display an explicit exclusion warning, no extra API call, no fake luggage inclusion.
 - [ ] Confirm first-character autocomplete and field-specific diagnostics with hosted browser after deployment.
 - [ ] Test several dynamic routes and nonzero ski bags from hosted private page; verify no out-of-date/changed quote is displayed.
 - [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
