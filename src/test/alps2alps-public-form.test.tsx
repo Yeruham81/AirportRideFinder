@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { AlpsPublicQuotePanel } from "@/components/alps/AlpsPublicQuotePanel";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -71,15 +71,14 @@ describe("Alps2Alps private dynamic public quote form", () => {
       target: { value: "10:15" },
     });
     fireEvent.change(screen.getByLabelText("Adults"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Currency"), { target: { value: "GBP" } });
     fireEvent.change(screen.getByLabelText("Suitcases"), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText("Ski / snowboard bags"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Search live public prices (no key)" }));
 
-    await waitFor(() => expect(screen.getByRole("status", {
-      name: "",
-    }).textContent ?? "").toContain("Public quote API connection successful"));
+    await screen.findByText("Public quote API connection successful.");
     expect(screen.getByText("Alpine XL van")).toBeTruthy();
-    expect(screen.getByText("£241.50")).toBeTruthy(); // currency changed in next assertion?
+    expect(screen.getByText("£241.50")).toBeTruthy();
     const requests = fetchMock.mock.calls.map(([url]) => new URL(url));
     expect(requests).toHaveLength(3);
     expect(requests.filter(url => url.pathname.endsWith("locations/search"))).toHaveLength(2);
@@ -90,6 +89,7 @@ describe("Alps2Alps private dynamic public quote form", () => {
     expect(q.searchParams.get("ski_bags")).toBe("2");
     expect(q.searchParams.get("luggage")).toBe("5");
     expect(q.searchParams.get("adults")).toBe("4");
+    expect(q.searchParams.get("currency")).toBe("GBP");
     expect(q.searchParams.has("promo")).toBe(false);
     expect(q.searchParams.has("pc")).toBe(false);
     expect(screen.queryByRole("link", { name: /book|deal|checkout/i })).toBeNull();
