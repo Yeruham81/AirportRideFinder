@@ -20,6 +20,7 @@ const locationError: Record<string, string> = {
   network_error: "Unable to reach the public location search API.",
   rate_limited: "Too many location searches. Please pause before trying again.",
   malformed_response: "The location list did not match the documented response.",
+  route_unavailable: "The provider reports this location search is unavailable.",
   http_error: "The provider could not complete location lookup.",
 };
 const quoteError: Record<string, string> = {
