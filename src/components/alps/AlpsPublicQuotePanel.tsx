@@ -71,7 +71,17 @@ export function AlpsPublicQuotePanel() {
     setResult(null);
     setCompleted(null);
   }
-  function updateFrom(next: AlpsPublicLocation | null) { invalidate(); setFrom(next); }
+  function updateFrom(next: AlpsPublicLocation | null) {
+    invalidate();
+    setFrom(next);
+    // When the user chooses a new origin, clear any previous destination
+    // that is not paired with it. This permits changing routes in one flow.
+    if (next && to && catalog?.status === "ok" &&
+      !alpsCatalogAllowsPair(catalog.catalog, next.code, to.code)) {
+      setTo(null);
+      setSwapId(v => v + 1);
+    }
+  }
   function updateTo(next: AlpsPublicLocation | null) { invalidate(); setTo(next); }
 
   function swap() {
@@ -125,7 +135,7 @@ export function AlpsPublicQuotePanel() {
       <div className="mt-5 grid items-start gap-3 md:grid-cols-[1fr_auto_1fr]">
         <AlpsLocationAutocomplete
           key={`from-${swapId}`} label="Pickup location"
-          selected={from} connectedTo={to} catalog={catalog}
+          selected={from} connectedTo={null} catalog={catalog}
           onSelected={updateFrom} disabled={busy}
         />
         <button
