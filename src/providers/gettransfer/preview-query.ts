@@ -29,8 +29,11 @@ export function getUnambiguousLocalInstant(
   date: string, time: string, timeZone: string,
 ): { instant: Date; dateTo: string } | null {
   if (!isValidDateString(date) || !isValidTimeString(time)) return null;
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute] = time.split(":").map(Number);
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  const hour = Number(time.slice(0, 2));
+  const minute = Number(time.slice(3, 5));
   const utcGuess = Date.UTC(year, month - 1, day, hour, minute);
   const matches = new Map<number, { instant: Date; dateTo: string }>();
   for (const hours of [-36, -12, 0, 12, 36]) {
