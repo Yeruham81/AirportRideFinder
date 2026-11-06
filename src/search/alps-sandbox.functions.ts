@@ -88,8 +88,17 @@ export const searchAlpsSandbox = createServerFn({ method: "POST" })
 
     const result = await fetchAlpsSandboxQuote(data);
     if (result.status === "ok") {
-      return { kind: "ok" as const, offers: result.offers, omitted: result.omitted };
+      return {
+        kind: "ok" as const,
+        offers: result.offers,
+        omitted: result.omitted,
+        vehicleCatalog: result.vehicleCatalog,
+      };
     }
     if (result.status === "no_offers") return { kind: "no_offers" as const };
-    return { kind: "error" as const, code: result.status };
+    return {
+      kind: "error" as const,
+      code: result.status,
+      stage: "stage" in result ? result.stage : null,
+    };
   });
