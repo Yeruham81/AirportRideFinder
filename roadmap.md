@@ -38,7 +38,10 @@
 - [x] Mock-only unit tests for price normalization, fail-closed API transport and zero unintended bookings
 - [x] Hosting preview enabled; first real B2B sandbox authentication request fails with `network_error` at POST /token. Independent GitHub runner HTTP confirms endpoint responds (400 for dummy credentials).
 - [x] Add separate credential-free, browser-side GET public quote diagnostic in protected /alps-preview; independently validated HTTP 200 and correct JSON fields for Geneva → Chamonix.
-- [ ] Confirm the public browser quote test works in Lovable after deployment and validate prices and pickup data.
+- [x] Confirm Public API from hosted browser: six live public prices, EUR 200–418.50, pickup 13-Nov-2026 at 14:00 local, 2 suitcases and 0 ski bags, no booking created.
+- [x] Add manual vendor location search, dynamic one-way routes, swap direction, EUR/GBP/USD, passenger and suitcase/ski-bag inputs; strictly confirm provider echoed values.
+- [x] Validate provider booking-link structure as non-actionable metadata only; no deep-link navigation or commission claims.
+- [ ] Test several dynamic routes and nonzero ski bags from hosted private page; verify no out-of-date/changed quote is displayed.
 - [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
 - [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
 - [ ] Production access and tracked redirects — not started
