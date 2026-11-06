@@ -140,9 +140,14 @@ describe("Alps2Alps dynamic route price quote and safe metadata", () => {
     expect(parseAlpsPublicQuote({
       ...sample, route: { ...sample.route, to_code: "resort-1" },
     }, query)).toEqual({ status: "quote_mismatch", field: "route" });
-    expect(parseAlpsPublicQuote({
+    const skiAdjusted = parseAlpsPublicQuote({
       ...sample, outbound: { ...sample.outbound, luggage: { normal_suitcases: 5, ski_bags: 0 } },
-    }, query)).toEqual({ status: "quote_mismatch", field: "ski_bags", requested: 2, quoted: 0 });
+    }, query);
+    expect(skiAdjusted.status).toBe("ok");
+    if (skiAdjusted.status !== "ok") throw Error("expected quoted 0-ski-bag prices");
+    expect(skiAdjusted.bagAdjustment).toEqual({ requestedSkiBags: 2, quotedSkiBags: 0 });
+    expect(skiAdjusted.skiBags).toBe(0);
+    expect(skiAdjusted.offers.map(x => x.actionable)).toEqual([false, false]);
     expect(parseAlpsPublicQuote({
       ...sample, outbound: { ...sample.outbound, luggage: { normal_suitcases: 2, ski_bags: 2 } },
     }, query)).toEqual({ status: "quote_mismatch", field: "suitcases", requested: 5, quoted: 2 });
