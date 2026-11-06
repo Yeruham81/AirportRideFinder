@@ -1,0 +1,26 @@
+name: Temporary Alps2Alps Connectivity Probe
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Probe POST token with deliberately invalid credentials (never secrets)
+        shell: bash
+        run: |
+          echo "B2B sandbox token endpoint, bogus credentials, expected HTTP error (not network failure)"
+          curl -sS --max-time 15 --connect-timeout 7 --location-trusted=false \
+            -X POST 'https://sandbox.amitours.com/api/v2/token' \
+            -H 'Content-Type: application/json' \
+            --data '{"api_key":"nonexistent-test-only","api_secret":"invalid-test-only"}' \
+            -o /dev/null -w "B2B POST HTTP status: %{http_code}; curl exit: %{exitcode}; TLS verify: %{ssl_verify_result}\n" || true
+      - name: Probe stateless public quotes with no promo and no credentials
+        shell: bash
+        run: |
+          echo "Public GET /transfer-options, no credentials, no booking endpoints"
+          curl -sS --max-time 18 --connect-timeout 7 \
+            'https://booking.alps2alps.com/api/public/v1/transfer-options?from=airport-1&to=resort-11&date=2026-12-20&time=14%3A30&adults=2&is_flight=0&currency=EUR' \
+            -o /dev/null -w "Public quotes HTTP status: %{http_code}; curl exit: %{exitcode}; TLS verify: %{ssl_verify_result}\n" || true
