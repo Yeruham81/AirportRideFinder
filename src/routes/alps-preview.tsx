@@ -22,6 +22,12 @@ export const Route = createFileRoute("/alps-preview")({
 
 type QuoteResult = Awaited<ReturnType<typeof searchAlpsSandbox>> | { kind: "request_failed" };
 
+const ALPS_STAGE_LABEL = {
+  token: "API authentication (POST /token)",
+  vehicles: "Vehicle catalog (GET /vehicles)",
+  transfer: "Transfer quote (POST /transfer)",
+} as const;
+
 function AlpsSandboxPreview() {
   const router = useRouter();
   const state = Route.useLoaderData();
@@ -169,6 +175,11 @@ function AlpsSandboxPreview() {
                 {" "}These are TEST values, not verified customer-facing production prices.
                 Final charges, luggage allowances, cancellation terms and affiliate attribution
                 have not been confirmed.
+                {quote.vehicleCatalog === "unavailable" && (
+                  <p className="mt-2 text-xs font-medium">
+                    Vehicle catalog could not be retrieved. Capacity and vehicle descriptions may be incomplete.
+                  </p>
+                )}
               </div>
               <h2 id="alps-quote-heading" className="font-display text-xl font-extrabold">
                 Quoted vehicles · EUR
@@ -234,7 +245,17 @@ function AlpsSandboxPreview() {
           {(quote?.kind === "error" || quote?.kind === "request_failed") && (
             <div role="alert" className="rounded-xl border bg-card p-4 text-sm">
               Sandbox API request could not be completed. Diagnostic code:{" "}
-              <code>{quote.kind === "request_failed" ? "request_failed" : quote.code}</code>. No credentials or provider payloads are shown.
+              <code>{quote.kind === "request_failed" ? "request_failed" : quote.code}</code>.
+              {quote.kind === "error" && quote.stage && (
+                <p className="mt-2 text-sm">
+                  Failed step: <strong>{ALPS_STAGE_LABEL[quote.stage]}</strong>.
+                  {quote.code === "network_error" &&
+                    " The request received no usable HTTP response. Check sandbox hostname availability, DNS/TLS and hosting outbound connectivity."}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Diagnostic labels do not contain credentials, tokens or raw provider responses.
+              </p>
             </div>
           )}
           {(quote?.kind === "disabled" || quote?.kind === "unconfigured") && (

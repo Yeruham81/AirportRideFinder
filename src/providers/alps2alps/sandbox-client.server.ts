@@ -14,11 +14,22 @@ export interface AlpsSandboxEnvironment {
   ALPS2ALPS_SANDBOX_PREVIEW_ENABLED?: string | undefined;
 }
 
+/** Public diagnostics contain only one of the three fixed operation names. */
+export type AlpsSandboxStage = "token" | "vehicles" | "transfer";
+
 export type AlpsSandboxResult =
-  | { status: "disabled" | "missing_secrets" | "unauthorized" | "timeout" | "network_error" | "malformed_response" | "rate_limited" }
-  | { status: "http_error"; httpStatus: number }
+  | { status: "disabled" | "missing_secrets" }
+  | {
+      status: "unauthorized" | "timeout" | "network_error" |
+        "malformed_response" | "rate_limited";
+      stage: AlpsSandboxStage;
+    }
+  | { status: "http_error"; httpStatus: number; stage: AlpsSandboxStage }
   | { status: "no_offers" }
-  | { status: "ok"; offers: AlpsPreviewOffer[]; omitted: number };
+  | {
+      status: "ok"; offers: AlpsPreviewOffer[]; omitted: number;
+      vehicleCatalog: "available" | "unavailable";
+    };
 
 type SandboxRequest = "token" | "vehicles" | "transfer";
 const ALLOWLIST: Record<SandboxRequest, { method: "GET" | "POST"; path: string }> = {
@@ -89,12 +100,12 @@ export async function fetchAlpsSandboxQuote(
     fetchImpl, timeoutMs,
     body: { api_key: apiKey, api_secret: apiSecret },
   });
-  if (token.status !== "ok") return token;
+  if (token.status !== "ok") return { ...token, stage: "token" as const };
   const obj = token.body && typeof token.body === "object" && !Array.isArray(token.body)
     ? token.body as Record<string, unknown> : null;
   const bearer = obj?.["token"];
   if (typeof bearer !== "string" || bearer.length < 8 || bearer.length > 4096) {
-    return { status: "malformed_response" };
+    return { status: "malformed_response", stage: "token" };
   }
 
   const [vehicleResponse, transferResponse] = await Promise.all([
@@ -109,13 +120,16 @@ export async function fetchAlpsSandboxQuote(
     if (transferResponse.status === "http_error" && transferResponse.httpStatus === 422) {
       return { status: "no_offers" };
     }
-    return transferResponse;
+    return { ...transferResponse, stage: "transfer" as const };
   }
   const vehicles = vehicleResponse.status === "ok"
     ? parseAlpsVehicles(vehicleResponse.body)
     : new Map();
   const parsed = parseAlpsTransfer(transferResponse.body, vehicles);
-  if (!parsed.validShape) return { status: "malformed_response" };
+  if (!parsed.validShape) return { status: "malformed_response", stage: "transfer" };
   if (!parsed.offers.length) return { status: "no_offers" };
-  return { status: "ok", offers: parsed.offers, omitted: parsed.omitted };
+  return {
+    status: "ok", offers: parsed.offers, omitted: parsed.omitted,
+    vehicleCatalog: vehicleResponse.status === "ok" ? "available" : "unavailable",
+  };
 }

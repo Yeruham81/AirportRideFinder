@@ -64,6 +64,31 @@ browser. Do not open this route to a public audience without a hosting-side
 Access/WAF gate and distributed rate limiting in front of the server
 functions. Existing in-memory limits are **per worker only**.
 
+## Hosted sandbox connectivity diagnostics (6 Nov 2026)
+
+The first Lovable-hosted sandbox search returned only `network_error`.
+The previous transport merged auth and quote network failures into one
+status. The private preview now reports a fixed, non-sensitive stage:
+`token` for POST /token, `transfer` for POST /transfer, or a separate
+vehicle-catalog warning when GET /vehicles is unreachable. Status/stage
+are allowlisted; raw exception messages and request headers are never
+returned to the client.
+
+An independent, **no-credentials** GitHub Actions probe confirmed that
+`sandbox.amitours.com` resolved in DNS, connected with verified TLS and
+responded HTTP 405 to HEAD on `/api/v2/token` (expected for a POST-only
+endpoint). This does **not** prove accessibility from the Lovable-hosted
+Cloudflare runtime; it narrows the question to runtime-dependent connectivity
+or a specific API request stage. The temporary diagnostic workflow was
+deleted before merging.
+
+After deployment, trigger **one** search again and record the fixed stage
+shown in the private preview. If stage=token and status=network_error,
+investigate outbound Cloudflare connections, origin IP restrictions or TLS
+compatibility; do not rotate working secrets without evidence. If the failure
+occurs only on transfer, investigate endpoint-specific access policies.
+Do not copy private credentials, raw request/response bodies or bearer tokens.
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,
