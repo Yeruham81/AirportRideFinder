@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { CarFront, KeyRound, Lock, Luggage, UsersRound } from "lucide-react";
 import { formatMoney } from "@/domain/money";
 import { defaultPickupDate } from "@/domain/time";
+import { AlpsPublicQuotePanel } from "@/components/alps/AlpsPublicQuotePanel";
 import { ALPS_PREVIEW_ROUTE } from "@/providers/alps2alps/sandbox-quote";
 import {
   getAlpsSandboxStatus, lockAlpsSandbox, searchAlpsSandbox, unlockAlpsSandbox,
@@ -167,6 +168,9 @@ function AlpsSandboxPreview() {
               {quotePending ? "Checking sandbox…" : "Search sandbox quotes"}
             </button>
           </form>
+
+          <AlpsPublicQuotePanel key={`${date}|${time}|${passengers}`}
+            date={date} time={time} passengers={passengers} />
 
           {quote?.kind === "ok" && (
             <section aria-labelledby="alps-quote-heading" className="space-y-3">
