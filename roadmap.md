@@ -41,6 +41,9 @@
 - [x] Confirm Public API from hosted browser: six live public prices, EUR 200–418.50, pickup 13-Nov-2026 at 14:00 local, 2 suitcases and 0 ski bags, no booking created.
 - [x] Add manual vendor location search, dynamic one-way routes, swap direction, EUR/GBP/USD, passenger and suitcase/ski-bag inputs; strictly confirm provider echoed values.
 - [x] Validate provider booking-link structure as non-actionable metadata only; no deep-link navigation or commission claims.
+- [x] Replace manual location search button with first-character autocomplete backed by the supplier's verified active-route directory (4,316 active rows; 6 Nov 2026), with keyboard/mouse selection and active-pair filtering.
+- [x] Diagnose reported generic `malformed_response`: distinguish mismatched quote fields and explain supplier's summer policy of ignoring ski bags instead of presenting a different quote.
+- [ ] Confirm first-character autocomplete and field-specific diagnostics with hosted browser after deployment.
 - [ ] Test several dynamic routes and nonzero ski bags from hosted private page; verify no out-of-date/changed quote is displayed.
 - [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
 - [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
