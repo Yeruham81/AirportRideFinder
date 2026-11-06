@@ -282,8 +282,8 @@ export async function fetchAlpsLocations(
   try { url = buildAlpsLocationSearchUrl(term); }
   catch { return { status: "invalid" }; }
   const response = await publicJson(url, options.fetchImpl ?? fetch, options.timeoutMs ?? 10000);
-  if (response.status !== "ok") return response.status === "route_unavailable"
-    ? { status: "http_error", httpStatus: 404 } : response;
+  if (response.status === "route_unavailable") return { status: "http_error", httpStatus: 404 };
+  if (response.status !== "ok") return response;
   const locations = parseAlpsLocations(response.body);
   return locations ? { status: "ok", locations } : { status: "malformed_response" };
 }
