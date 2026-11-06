@@ -109,9 +109,29 @@ describe("Alps2Alps official active route autocomplete catalog", () => {
         ],
       },
     };
-    expect(parseAlpsPublicQuote(body, query)).toEqual({
-      status: "quote_mismatch", field: "ski_bags", requested: 2, quoted: 0,
-    });
-    expect(parseAlpsPublicQuote(body, { ...query, skiBags: 0 }).status).toBe("ok");
+    const adjusted = parseAlpsPublicQuote(body, query);
+    expect(adjusted.status).toBe("ok");
+    if (adjusted.status !== "ok") throw Error("expected verified 0-ski-bag quote");
+    expect(adjusted.skiBags).toBe(0);
+    expect(adjusted.bagAdjustment).toEqual({ requestedSkiBags: 2, quotedSkiBags: 0 });
+    expect(adjusted.offers[0]?.price).toEqual({ currency: "GBP", minor: 24125 });
+    expect(adjusted.offers[0]?.actionable).toBe(false);
+    const requestedZero = parseAlpsPublicQuote(body, { ...query, skiBags: 0 });
+    expect(requestedZero.status).toBe("ok");
+    if (requestedZero.status !== "ok") throw Error("expected regular quote");
+    expect(requestedZero.bagAdjustment).toBeUndefined();
+    // Other baggage mismatches must not silently pass.
+    expect(parseAlpsPublicQuote({
+      ...body, outbound: {
+        ...body.outbound,
+        luggage: { normal_suitcases: 1, ski_bags: 0 },
+      },
+    }, query)).toEqual({ status: "quote_mismatch", field: "suitcases", requested: 2, quoted: 1 });
+    expect(parseAlpsPublicQuote({
+      ...body, outbound: {
+        ...body.outbound,
+        luggage: { normal_suitcases: 2, ski_bags: 1 },
+      },
+    }, query)).toEqual({ status: "quote_mismatch", field: "ski_bags", requested: 2, quoted: 1 });
   });
 });
