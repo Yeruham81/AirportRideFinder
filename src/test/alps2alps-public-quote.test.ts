@@ -7,7 +7,7 @@ import {
   validateAlpsPublicQuery,
 } from "@/providers/alps2alps/public-quote";
 
-const query = { date: "2030-12-20", time: "14:30", passengers: 2, luggage: 2 };
+const query = { from: "airport-1", to: "resort-11", date: "2030-12-20", time: "14:30", passengers: 2, luggage: 2, skiBags: 0, currency: "EUR" as const };
 const sample = {
   disclaimer: "Public quote engine",
   quote_url: "https://booking.alps2alps.com/book/quick-search?unsafe=example",
@@ -52,7 +52,7 @@ describe("Alps2Alps public GET quote-only client", () => {
     expect(url.pathname).toBe("/api/public/v1/transfer-options");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       from: "airport-1", to: "resort-11", date: "2030-12-20",
-      time: "14:30", adults: "2", luggage: "2", ski_bags: "0",
+      time: "14:30", adults: "2", luggage: "2", ski_bags: "0", ski: "0",
       is_flight: "0", currency: "EUR",
     });
     for (const forbidden of ["pc", "promo", "promo_code", "booking_url", "api_key", "api_secret"]) {
@@ -64,7 +64,8 @@ describe("Alps2Alps public GET quote-only client", () => {
     expect(validateAlpsPublicQuery(query, new Date("2026-11-06T00:00:00Z"))).toBe(true);
     for (const q of [
       { ...query, date: "2020-12-20" }, { ...query, time: "25:00" },
-      { ...query, passengers: 0 }, { ...query, luggage: 9 },
+      { ...query, passengers: 0 }, { ...query, luggage: 9 }, { ...query, skiBags: 9 },
+      { ...query, from: "javascript:foo" }, { ...query, from: "resort-11" },
       { ...query, luggage: -1 }, { ...query, luggage: 2.5 },
     ]) {
       expect(validateAlpsPublicQuery(q)).toBe(false);
@@ -89,6 +90,7 @@ describe("Alps2Alps public GET quote-only client", () => {
     });
     expect(r.luggage).toBe(2);
     expect(r.skiBags).toBe(0);
+    expect(r.route).toEqual({ from: "Geneva Airport", to: "Chamonix" });
     expect(JSON.stringify(r)).not.toContain("quick-checkout");
     expect(JSON.stringify(r)).not.toContain("quick-search");
     expect(JSON.stringify(r)).not.toContain("booking_url");

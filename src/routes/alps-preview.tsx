@@ -84,7 +84,7 @@ function AlpsSandboxPreview() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Restricted sandbox · Alps2Alps · Not live prices</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Restricted integration test · Alps2Alps · Not a public booking page</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Alps2Alps — API integration preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           A separate development-only preview for testing the Amitours B2B API v2.
@@ -129,6 +129,12 @@ function AlpsSandboxPreview() {
               <Lock className="size-4" aria-hidden /> Lock sandbox preview
             </button>
           </div>
+          <AlpsPublicQuotePanel />
+          <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+            <strong>Amitours B2B Sandbox — separate legacy diagnostic.</strong>{" "}
+            Its POST /token connection may fail in this hosting environment.
+            Public API tests above do not require these B2B keys.
+          </div>
           <form onSubmit={(event) => void search(event)} className="rounded-xl border bg-card p-5 shadow-card">
             <h2 className="font-display text-lg font-bold">One-way private transfer — test route</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -168,9 +174,6 @@ function AlpsSandboxPreview() {
               {quotePending ? "Checking sandbox…" : "Search sandbox quotes"}
             </button>
           </form>
-
-          <AlpsPublicQuotePanel key={`${date}|${time}|${passengers}`}
-            date={date} time={time} passengers={passengers} />
 
           {quote?.kind === "ok" && (
             <section aria-labelledby="alps-quote-heading" className="space-y-3">
