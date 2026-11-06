@@ -50,7 +50,9 @@
 - [ ] Compare two real public API quotes against provider checkout (exact route, time, vehicle, passengers, luggage, EUR total); do not complete payment.
 - [ ] Validate supplier-provided vehicle URLs in controlled preview without enabling affiliate redirects; confirm customer-facing quote details and return behavior.
 - [x] Verify winter ski-bag handling: no-secret public GET returned 3 confirmed ski bags for 3 passengers on Geneva→Chamonix (22 Jan 2027) and Geneva→Avoriaz (11 Feb 2027); these responses unexpectedly confirmed 0 ordinary suitcases although 3 were requested.
-- [ ] Clarify with Laura how Alps2Alps supports simultaneous ordinary suitcases and ski bags in winter, given API responses above; summer ski counts are ignored. Retain ski-bag input because winter routes support it.
+- [x] Verify date-specific supplier quote behavior across seasons: Dec–Apr echoes requested ski bags and 0 suitcases, May–Nov echoes requested suitcases and 0 ski bags (11 independent GET probes; 12th HTTP 429 stopped).
+- [x] Simplify private baggage search to only the provider-supported seasonal select (ski bags Dec–Apr, suitcases May–Nov), with explicit 0 for the inactive type, strict quote reconciliation and unobtrusive fallback notices if the supplier changes its behavior.
+- [ ] Verify that Dec 1 / May 1 cutoff dates are official (observed, not published) and stable in future years; confirm with Laura whether both baggage types can be carried together and how to quote/charge them.
 - [ ] Confirm affiliate attribution for AIRPORTRIDEFINDER in API-generated checkout links, and permission for side-by-side competitor comparison, with Laura (one consolidated email after tests).
 - [ ] Establish production quote rate limits, freshness/cache policy and safe 429 retry behavior; avoid assuming unlimited browser-side GETs.
 - [ ] Consider return trips, children/child seats and cancellation terms after core one-way referral flow is approved.
