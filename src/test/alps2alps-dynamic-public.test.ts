@@ -51,7 +51,7 @@ describe("Alps2Alps official dynamic public location lookup", () => {
     expect(url.pathname).toBe("/api/public/v1/locations/search");
     expect(Object.fromEntries(url.searchParams)).toEqual({ q: "Grenoble" });
     expect(url.searchParams.has("api_key")).toBe(false);
-    for (const s of ["", "a", "x".repeat(81), "\nmalicious"]) {
+    for (const s of ["", "a", "x".repeat(81), "mal\nicious"]) {
       expect(() => buildAlpsLocationSearchUrl(s)).toThrow();
     }
   });
