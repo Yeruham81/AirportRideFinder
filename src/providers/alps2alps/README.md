@@ -220,6 +220,33 @@ Supplier rate limits and separate host Access/WAF protections must still be
 respected for any wider use. The exploratory GitHub probe was deleted
 before merging.
 
+## Winter vs summer ski baggage verification (6 Nov 2026)
+
+The supplier's public developer guide describes **seasonal luggage rules**:
+summer searches ignore ski bags; winter searches support requested ski bags
+(and default to ski bags when unspecified). To avoid hiding a legitimately
+supported feature, we **retain the ski/snowboard bag selector** in the
+private test search.
+
+Two no-credentials, read-only public GET probes with 3 adults, 3 suitcases,
+3 ski bags and a 14:00 pickup confirmed:
+- Geneva Airport → Chamonix, **22 Jan 2027**: HTTP 200, 3 ski bags,
+  **0 ordinary suitcases**, 3 vehicle offers.
+- Geneva Airport → Avoriaz, **11 Feb 2027**: HTTP 200, 3 ski bags,
+  **0 ordinary suitcases**, 3 vehicle offers.
+
+Thus the original premise that *all* requests ignore ski bags is false,
+but the requested **combination** is not confirmed by the provider.
+The strict existing parser correctly rejects a three-suitcase quote if
+the supplier echoes zero ordinary suitcases; it must not silently show
+that price as covering all the requested luggage. Whether both categories
+can be transported together and how to obtain an accurate basket requires
+a supplier clarification. No booking was made and no actual credentials
+were used. The temporary probe workflow was removed after testing.
+
+Supplier reference:
+https://www.alps2alps.com/developers/public-api/#seasonal-extras-luggage-vs-skis
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,

@@ -44,8 +44,16 @@
 - [x] Replace manual location search button with first-character autocomplete backed by the supplier's verified active-route directory (4,316 active rows; 6 Nov 2026), with keyboard/mouse selection and active-pair filtering.
 - [x] Diagnose reported generic `malformed_response`: distinguish mismatched quote fields and explain supplier's summer policy of ignoring ski bags instead of presenting a different quote.
 - [x] Automatically show the already-returned provider zero-ski-bag prices if original search requested more: adjust input to 0 and display an explicit exclusion warning, no extra API call, no fake luggage inclusion.
-- [ ] Confirm first-character autocomplete and field-specific diagnostics with hosted browser after deployment.
+- [x] Confirm first-character autocomplete in hosted browser (user verified), and zero-ski-bag fallback: 6 genuine offers displayed with explicit exclusion notice.
+- [x] Simplify the exclusion notice while keeping the requested count, quoted 0, and carriage/fees warning.
 - [ ] Test several dynamic routes and nonzero ski bags from hosted private page; verify no out-of-date/changed quote is displayed.
+- [ ] Compare two real public API quotes against provider checkout (exact route, time, vehicle, passengers, luggage, EUR total); do not complete payment.
+- [ ] Validate supplier-provided vehicle URLs in controlled preview without enabling affiliate redirects; confirm customer-facing quote details and return behavior.
+- [x] Verify winter ski-bag handling: no-secret public GET returned 3 confirmed ski bags for 3 passengers on Geneva→Chamonix (22 Jan 2027) and Geneva→Avoriaz (11 Feb 2027); these responses unexpectedly confirmed 0 ordinary suitcases although 3 were requested.
+- [ ] Clarify with Laura how Alps2Alps supports simultaneous ordinary suitcases and ski bags in winter, given API responses above; summer ski counts are ignored. Retain ski-bag input because winter routes support it.
+- [ ] Confirm affiliate attribution for AIRPORTRIDEFINDER in API-generated checkout links, and permission for side-by-side competitor comparison, with Laura (one consolidated email after tests).
+- [ ] Establish production quote rate limits, freshness/cache policy and safe 429 retry behavior; avoid assuming unlimited browser-side GETs.
+- [ ] Consider return trips, children/child seats and cancellation terms after core one-way referral flow is approved.
 - [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
 - [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
 - [ ] Production access and tracked redirects — not started
