@@ -170,6 +170,49 @@ https://www.alps2alps.com/developers/public-api/
 The existing fixed-route **B2B Sandbox** controls remain separate and may
 continue to show `network_error` at `POST /token` in Lovable hosting.
 
+## Route-directory autocomplete and explained quote mismatches
+
+The private public-API test no longer requires **Find locations**. Once the
+authenticated preview mounts, it makes one **keyless GET** to the supplier's
+official active-route resource:
+`https://booking.alps2alps.com/api/resource/routes` (also linked by Laura).
+An independent no-credentials request on 6 Nov 2026 confirmed HTTP 200,
+CORS `*`, 4,351 route records and 4,316 active route rows (approximately
+815 KB). The one-time response supplies canonical `station`, `resort`,
+names and `is_active`. Only active, shape-valid rows are accepted. The
+picker filters those provider-supplied endpoints locally **from the first
+character**, supports accent-insensitive matching, keyboard ArrowDown/Up,
+Enter, Escape, or mouse selection; there are no per-keystroke quote calls.
+The destination suggestions are constrained to active supplier pairings from
+the chosen origin; choosing a different origin clears an incompatible
+previous destination. The vendor still checks availability at quote time.
+Only in case the master route catalog is unavailable, the picker falls back
+to the official public `GET /locations/search?q=...` endpoint, debounced
+after at least two typed characters as required by its documentation.
+The two pre-existing Geneva Airport and Chamonix sample locations are the
+only preloaded fallback suggestions and are actual verified supplier codes.
+
+A temporary, credential-free workflow verified that the live public GET
+`/transfer-options` echoed the selected November route/date/time, passenger
+count and luggage for Geneva Airport → Chamonix. For a **July** departure,
+the supplier returned `ski_bags=0` after receiving a request for two ski
+bags: its documented summer policy ignores ski bags. Previously the strict
+parser reported a generic `malformed_response`. The updated parser now
+returns a non-sensitive `quote_mismatch` reason identifying which of route,
+currency, adult count, pickup time, suitcases or ski bags differed. When
+ski bags differ, the private UI shows both counts and an explicit
+**Change ski bags to 0** action. Prices remain hidden until the user
+re-requests a matching configuration. A truly malformed upstream JSON shape
+still returns `malformed_response`; we never invent a quote.
+
+The route catalog request is automatic **only after authentication**;
+the real price GET remains manual. Neither catalog nor search uses provider
+API credentials, `AIRPORTRIDEFINDER` tracking code, booking endpoints or
+deep links. There is no public customer-facing comparison or booking flow.
+Supplier rate limits and separate host Access/WAF protections must still be
+respected for any wider use. The exploratory GitHub probe was deleted
+before merging.
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,

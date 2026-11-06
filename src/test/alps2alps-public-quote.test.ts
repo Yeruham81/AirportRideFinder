@@ -99,12 +99,12 @@ describe("Alps2Alps public GET quote-only client", () => {
   it("rejects mismatched route, currency, group size and nonliteral pickup time", () => {
     const changed = (patch: Record<string, unknown>) =>
       parseAlpsPublicQuote({ ...sample, ...patch }, query);
-    expect(changed({ currency: "USD" }).status).toBe("malformed_response");
-    expect(changed({ passengers: { adults: 3 } }).status).toBe("malformed_response");
-    expect(changed({ route: { from_code: "airport-2", to_code: "resort-11" } }).status)
-      .toBe("malformed_response");
-    expect(changed({ outbound: { ...sample.outbound, pick_up_date_time: "2030-12-20 13:00:00" } }).status)
-      .toBe("malformed_response");
+    expect(changed({ currency: "USD" })).toEqual({ status: "quote_mismatch", field: "currency" });
+    expect(changed({ passengers: { adults: 3 } })).toEqual({ status: "quote_mismatch", field: "passengers" });
+    expect(changed({ route: { ...sample.route, from_code: "airport-2" } }))
+      .toEqual({ status: "quote_mismatch", field: "route" });
+    expect(changed({ outbound: { ...sample.outbound, pick_up_date_time: "2030-12-20 13:00:00" } }))
+      .toEqual({ status: "quote_mismatch", field: "pickup_time" });
     expect(changed({ outbound: { ...sample.outbound, luggage: undefined } }).status)
       .toBe("malformed_response");
   });

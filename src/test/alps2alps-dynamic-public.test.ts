@@ -131,16 +131,27 @@ describe("Alps2Alps dynamic route price quote and safe metadata", () => {
   });
 
   it("rejects missing, mismatched or silently defaulted ski-bag / suitcase counts", () => {
-    for (const change of [
-      { currency: "EUR" }, { passengers: { adults: 3 } },
-      { route: { ...sample.route, to_code: "resort-1" } },
-      { outbound: { ...sample.outbound, luggage: { normal_suitcases: 5, ski_bags: 0 } } },
-      { outbound: { ...sample.outbound, luggage: { normal_suitcases: 2, ski_bags: 2 } } },
-      { outbound: { ...sample.outbound, pick_up_date_time: "2031-01-20 11:15:00" } },
-    ]) {
-      expect(parseAlpsPublicQuote({ ...sample, ...change }, query).status)
-        .toBe("malformed_response");
-    }
+    expect(parseAlpsPublicQuote({
+      ...sample, currency: "EUR",
+    }, query)).toEqual({ status: "quote_mismatch", field: "currency" });
+    expect(parseAlpsPublicQuote({
+      ...sample, passengers: { adults: 3 },
+    }, query)).toEqual({ status: "quote_mismatch", field: "passengers" });
+    expect(parseAlpsPublicQuote({
+      ...sample, route: { ...sample.route, to_code: "resort-1" },
+    }, query)).toEqual({ status: "quote_mismatch", field: "route" });
+    expect(parseAlpsPublicQuote({
+      ...sample, outbound: { ...sample.outbound, luggage: { normal_suitcases: 5, ski_bags: 0 } },
+    }, query)).toEqual({ status: "quote_mismatch", field: "ski_bags", requested: 2, quoted: 0 });
+    expect(parseAlpsPublicQuote({
+      ...sample, outbound: { ...sample.outbound, luggage: { normal_suitcases: 2, ski_bags: 2 } },
+    }, query)).toEqual({ status: "quote_mismatch", field: "suitcases", requested: 5, quoted: 2 });
+    expect(parseAlpsPublicQuote({
+      ...sample, outbound: { ...sample.outbound, pick_up_date_time: "2031-01-20 11:15:00" },
+    }, query)).toEqual({ status: "quote_mismatch", field: "pickup_time" });
+    expect(parseAlpsPublicQuote({
+      ...sample, outbound: { ...sample.outbound, luggage: undefined },
+    }, query)).toEqual({ status: "malformed_response" });
   });
 
   it("returns no_offers when no requested-time vehicle can fit party and baggage", () => {
