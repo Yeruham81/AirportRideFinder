@@ -172,7 +172,7 @@ export function parseAlpsRouteCatalog(body: unknown): AlpsRouteCatalog | null {
   const places = new Map<string, AlpsPublicLocation>();
   const pairs = new Set<string>();
   const typeFromCode = (code: string): AlpsPublicLocation["type"] =>
-    code.slice(0, code.lastIndexOf("-")) as AlpsPublicLocation["type"];
+    code.slice(0, code.indexOf("-")) as AlpsPublicLocation["type"];
   for (const raw of body) {
     const row = record(raw);
     if (!row || (row["is_active"] !== 1 && row["is_active"] !== true)) continue;
