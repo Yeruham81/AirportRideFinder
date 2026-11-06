@@ -152,9 +152,11 @@ describe("Alps2Alps private instant location typeahead and quote form", () => {
     await screen.findByText("Public quote API connection successful.");
     expect(screen.getByText("Alpine XL van")).toBeTruthy();
     const note = screen.getByRole("alert");
-    expect(note.textContent).toContain("You requested 3 ski/snowboard bags");
-    expect(note.textContent).toContain("Prices below are for 0 ski bags only");
-    expect(note.textContent).toContain("confirm acceptance and any additional charges");
+    expect(note.textContent).toContain("Ski bags excluded:");
+    expect(note.textContent).toContain("Alps2Alps quoted 0 of the 3 requested.");
+    expect(note.textContent).toContain("Prices exclude ski bags;");
+    expect(note.textContent).toContain("confirm transport and any extra fees with the provider.");
+    expect(note.textContent).not.toContain("search field has been adjusted");
     expect((screen.getByLabelText("Ski / snowboard bags") as HTMLSelectElement).value).toBe("0");
     expect(screen.getByText(/3 suitcases and 0 ski bags/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Change ski bags to 0" })).toBeNull();
