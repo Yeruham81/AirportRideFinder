@@ -36,7 +36,10 @@
 - [x] Separate noindex /alps-preview behind an existing strong preview password, independent signed cookie and bounded quotas
 - [x] User-triggered Geneva → Chamonix sandbox-only price preview with explicit non-booking disclaimer
 - [x] Mock-only unit tests for price normalization, fail-closed API transport and zero unintended bookings
-- [ ] Enable ALPS2ALPS_SANDBOX_PREVIEW_ENABLED=true in hosting secrets and verify real sandbox authentication and quote shape
+- [x] Hosting preview enabled; first real B2B sandbox authentication request fails with `network_error` at POST /token. Independent GitHub runner HTTP confirms endpoint responds (400 for dummy credentials).
+- [x] Add separate credential-free, browser-side GET public quote diagnostic in protected /alps-preview; independently validated HTTP 200 and correct JSON fields for Geneva → Chamonix.
+- [ ] Confirm the public browser quote test works in Lovable after deployment and validate prices and pickup data.
+- [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
 - [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
 - [ ] Production access and tracked redirects — not started
 
