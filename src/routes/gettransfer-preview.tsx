@@ -225,8 +225,7 @@ function GetTransferSandboxPreview() {
               </div>
               <div className="space-y-3">
                 {[...quote.offers].sort((a, b) =>
-                  a.price && b.price ? a.price.minor - b.price.minor :
-                  a.price ? -1 : b.price ? 1 : a.type.localeCompare(b.type)
+                  a.price.minor - b.price.minor || a.type.localeCompare(b.type)
                 ).map((offer) => (
                   <article key={offer.type} className="rounded-xl border bg-card p-4 shadow-card sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -250,18 +249,10 @@ function GetTransferSandboxPreview() {
                         </div>
                       </div>
                       <div className="sm:text-right">
-                        {offer.price ? (
-                          <>
-                            <p className="font-display text-3xl font-extrabold tabular-nums">
-                              {formatMoney(offer.price)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">book_now · sandbox only</p>
-                          </>
-                        ) : (
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            No immediate quote returned
-                          </p>
-                        )}
+                        <p className="font-display text-3xl font-extrabold tabular-nums">
+                          {formatMoney(offer.price)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">book_now · sandbox only</p>
                       </div>
                     </div>
                   </article>
@@ -272,7 +263,7 @@ function GetTransferSandboxPreview() {
 
           {quote?.kind === "no_offers" && (
             <div role="status" className="rounded-xl border bg-card p-5 text-sm">
-              GetTransfer returned no sandbox price categories for this route and time.
+              GetTransfer returned no immediate sandbox prices (book_now) for this route and time.
             </div>
           )}
           {quote?.kind === "invalid" && (

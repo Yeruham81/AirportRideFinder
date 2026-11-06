@@ -6,7 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { deleteCookie, getCookie, setCookie, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { sandboxRouteInfo } from "@/providers/gettransfer/sandbox-client.server";
-import { buildGetTransferPreviewQuery } from "@/providers/gettransfer/preview-query";
+import { buildGetTransferPreviewQuery, visibleGetTransferSandboxQuotes } from "@/providers/gettransfer/preview-query";
 import {
   checkPreviewPassword, consumePreviewLimit, createPreviewSession,
   previewSecretsReady, verifyPreviewSession,
@@ -96,14 +96,11 @@ export const searchGetTransferPreview = createServerFn({ method: "POST" })
     if (result.diagnostics.success !== true || result.diagnostics.prices.length === 0)
       return { kind: "no_offers" as const };
 
-    // Only documented, sanitized vehicle categories and price fields.
-    // book_now is distinct from indicative 'min'; no bookable production offer
-    // or checkout URL is exposed. No original response body is returned.
-    const offers = result.diagnostics.prices.slice(0, 24).map((price) => ({
-      type: price.type,
-      price: price.bookNow?.amount ?? null,
-      indicativeMin: price.indicativeMin,
-    }));
+    // Show only categories with a usable immediate sandbox book_now price.
+    // Indicative-only categories are intentionally omitted from the preview.
+    // This remains read-only; no booking URL or production offer is exposed.
+    const offers = visibleGetTransferSandboxQuotes(result.diagnostics.prices);
+    if (offers.length === 0) return { kind: "no_offers" as const };
     return {
       kind: "ok" as const,
       routeLabel: prepared.routeLabel,

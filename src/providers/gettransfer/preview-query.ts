@@ -5,7 +5,7 @@
  */
 import { getLocation } from "@/data/locations";
 import { isValidDateString, isValidTimeString, localDateTimeWithOffset } from "@/domain/time";
-import type { RouteInfoQuery } from "./route-info";
+import type { RouteInfoQuery, VehicleTypePrice } from "./route-info";
 
 export const GETTRANSFER_PREVIEW_ROUTES = [
   { id: "london", from: "lhr", to: "central-london", currency: "USD" },
@@ -81,4 +81,22 @@ export function buildGetTransferPreviewQuery(
     routeLabel: `${from.shortName} → ${to.shortName}`,
     dateTo: local.dateTo,
   };
+}
+
+/**
+ * Render only returned GetTransfer sandbox categories that have a parsed
+ * immediate `book_now` amount. Indicative-only categories are not offers and
+ * should not clutter the private quote preview. This does not establish
+ * production availability or enable customer booking.
+ */
+export function visibleGetTransferSandboxQuotes(prices: readonly VehicleTypePrice[]) {
+  return prices.flatMap((entry) => {
+    const price = entry.bookNow?.amount;
+    if (!price || price.minor <= 0) return [];
+    return [{
+      type: entry.type,
+      price,
+      indicativeMin: entry.indicativeMin,
+    }];
+  }).slice(0, 24);
 }
