@@ -1,23 +1,39 @@
 /**
- * Browser-safe, stateless read-only quote client for the Alps2Alps PUBLIC API.
- * No API key/secret, no booking endpoints, no affiliate redirects, no promo
- * applied until the supplier confirms commission attribution.
- *
- * Official: https://www.alps2alps.com/developers/public-api/
- * API explicitly documents browser CORS, GET quote-only, and no persisted row.
+ * Read-only Alps2Alps Public API. Client-side, no credentials and no
+ * bookings, redirects, affiliate markers, or checkout actions.
+ * All browser calls are opt-in and use the two published GET endpoints.
  */
 import { moneyFromDecimal, type Money } from "@/domain/money";
-import {
-  ALPS_PREVIEW_ROUTE, validateAlpsQuoteQuery, type AlpsQuoteQuery,
-} from "./sandbox-quote";
+import { isValidDateString, isValidTimeString, isPastPickup } from "@/domain/time";
 
-export const ALPS_PUBLIC_QUOTE_ENDPOINT =
-  "https://booking.alps2alps.com/api/public/v1/transfer-options" as const;
+const PUBLIC_BASE = "https://booking.alps2alps.com/api/public/v1";
+export const ALPS_PUBLIC_QUOTE_ENDPOINT = `${PUBLIC_BASE}/transfer-options` as const;
+export const ALPS_PUBLIC_LOCATIONS_ENDPOINT = `${PUBLIC_BASE}/locations/search` as const;
 
-export interface AlpsPublicQuoteQuery extends AlpsQuoteQuery {
-  luggage: number;
+export const ALPS_INITIAL_FROM = {
+  code: "airport-1", name: "Geneva Airport", type: "airport", country: "Switzerland",
+} as const;
+export const ALPS_INITIAL_TO = {
+  code: "resort-11", name: "Chamonix", type: "resort", country: "France",
+} as const;
+
+export type AlpsPublicCurrency = "EUR" | "GBP" | "USD";
+export interface AlpsPublicLocation {
+  code: string;
+  name: string;
+  type: "airport" | "resort" | "city" | "train_station";
+  country: string;
 }
-
+export interface AlpsPublicQuoteQuery {
+  from: string;
+  to: string;
+  date: string;
+  time: string;
+  passengers: number;
+  luggage: number;
+  skiBags: number;
+  currency: AlpsPublicCurrency;
+}
 export interface AlpsPublicOffer {
   id: string;
   vehicleLabel: string;
@@ -28,124 +44,214 @@ export interface AlpsPublicOffer {
   source: "public_live";
   actionable: false;
 }
-
 export type AlpsPublicQuoteResult =
   | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "no_offers" | "route_unavailable" }
   | { status: "http_error"; httpStatus: number }
-  | { status: "ok"; offers: AlpsPublicOffer[]; pickupTime: string; luggage: number; skiBags: number };
+  | {
+      status: "ok";
+      offers: AlpsPublicOffer[];
+      pickupTime: string;
+      luggage: number;
+      skiBags: number;
+      route: { from: string; to: string };
+      /** Diagnostics only. Never expose or launch vendor-provided checkout URLs. */
+      linkEvidence: { quoteUrlPresent: boolean; vehicleUrlsPresent: number };
+    };
 
+export type AlpsLocationSearchResult =
+  | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" }
+  | { status: "http_error"; httpStatus: number }
+  | { status: "ok"; locations: AlpsPublicLocation[] };
+
+const CODE = /^(?:airport|resort|city|train_station)-[1-9]\d{0,7}(?:-[a-z])?$/;
+const MAX_BODY = 1_000_000;
+
+export function validAlpsLocationCode(code: string): boolean {
+  return CODE.test(code);
+}
 function record(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === "object" && !Array.isArray(v)
     ? v as Record<string, unknown> : null;
 }
-
 function within(v: unknown, max = 100): number | null {
-  return typeof v === "number" && Number.isSafeInteger(v) && v >= 0 && v <= max
-    ? v : null;
+  return typeof v === "number" && Number.isSafeInteger(v) && v >= 0 && v <= max ? v : null;
 }
-function priceInEuros(v: unknown): Money | null {
+function safeLabel(v: unknown, max = 120): string | null {
+  if (typeof v !== "string" || v.trim().length === 0 || v.length > max ||
+    /[\x00-\x1F\x7F]/.test(v)) return null;
+  return v.trim();
+}
+function money(v: unknown, currency: AlpsPublicCurrency): Money | null {
   const decimal = typeof v === "number" && Number.isFinite(v) ? String(v) : v;
   if (typeof decimal !== "string" || !/^\d{1,8}(?:\.\d{1,2})?$/.test(decimal)) return null;
   try {
-    const price = moneyFromDecimal("EUR", decimal);
-    return price.minor > 0 ? price : null;
+    const amount = moneyFromDecimal(currency, decimal);
+    return amount.minor > 0 ? amount : null;
   } catch { return null; }
+}
+function knownCurrency(value: string): value is AlpsPublicCurrency {
+  return value === "EUR" || value === "GBP" || value === "USD";
 }
 
 export function validateAlpsPublicQuery(
-  v: AlpsPublicQuoteQuery,
+  query: AlpsPublicQuoteQuery,
   now = new Date(),
 ): boolean {
-  return validateAlpsQuoteQuery(v, now).ok && Number.isSafeInteger(v.luggage)
-    && v.luggage >= 0 && v.luggage <= 8;
+  return validAlpsLocationCode(query.from) && validAlpsLocationCode(query.to) &&
+    query.from !== query.to &&
+    isValidDateString(query.date) && isValidTimeString(query.time) &&
+    // Supported Alpine destinations use Central European local pickup time.
+    isPastPickup(query.date, query.time, "Europe/Zurich", now) === false &&
+    Number.isSafeInteger(query.passengers) && query.passengers >= 1 && query.passengers <= 16 &&
+    Number.isSafeInteger(query.luggage) && query.luggage >= 0 && query.luggage <= 8 &&
+    Number.isSafeInteger(query.skiBags) && query.skiBags >= 0 && query.skiBags <= 8 &&
+    knownCurrency(query.currency);
 }
 
-/** Fixed quote-only destination and type. No arbitrary URL or provider redirects. */
 export function buildAlpsPublicQuoteUrl(query: AlpsPublicQuoteQuery): string {
   if (!validateAlpsPublicQuery(query)) throw new Error("Invalid Alps public quote request");
   const url = new URL(ALPS_PUBLIC_QUOTE_ENDPOINT);
-  url.searchParams.set("from", ALPS_PREVIEW_ROUTE.from);
-  url.searchParams.set("to", ALPS_PREVIEW_ROUTE.to);
+  url.searchParams.set("from", query.from);
+  url.searchParams.set("to", query.to);
   url.searchParams.set("date", query.date);
   url.searchParams.set("time", query.time);
   url.searchParams.set("adults", String(query.passengers));
   url.searchParams.set("luggage", String(query.luggage));
-  url.searchParams.set("ski_bags", "0");
-  url.searchParams.set("is_flight", "0"); // Literal pickup time, not flight arrival.
-  url.searchParams.set("currency", "EUR");
-  // No promo, source or affiliate parameters: attribution not yet approved.
+  url.searchParams.set("ski_bags", String(query.skiBags));
+  url.searchParams.set("ski", query.skiBags > 0 ? "1" : "0");
+  url.searchParams.set("is_flight", "0"); // Treat time as the pickup time, not flight arrival.
+  url.searchParams.set("currency", query.currency);
+  // Attribution / discount semantics are unconfirmed. No pc, promo, source or deep links.
   return url.toString();
 }
 
-/** Return only normalized quote fields. Drop booking_url and quote_url entirely. */
+export function parseAlpsLocations(body: unknown): AlpsPublicLocation[] | null {
+  if (!Array.isArray(body) || body.length > 500) return null;
+  const found: AlpsPublicLocation[] = [];
+  const seen = new Set<string>();
+  for (const raw of body) {
+    const item = record(raw);
+    const code = item?.["code"];
+    const name = safeLabel(item?.["name"]);
+    const country = safeLabel(item?.["country"], 80);
+    const type = item?.["type"];
+    if (typeof code !== "string" || !validAlpsLocationCode(code) ||
+      !name || !country || !["airport", "resort", "city", "train_station"].includes(String(type)) ||
+      seen.has(code)) continue;
+    if (!code.startsWith(`${type}-`)) continue;
+    seen.add(code);
+    found.push({ code, name, type: type as AlpsPublicLocation["type"], country });
+  }
+  // Displayed options may be limited, but only vendor-returned codes are selectable.
+  return found.slice(0, 35);
+}
+
+export function buildAlpsLocationSearchUrl(term: string): string {
+  const q = term.trim();
+  if (q.length < 2 || q.length > 80 || /[\x00-\x1F\x7F]/.test(q)) {
+    throw new Error("Location search requires 2–80 printable characters");
+  }
+  const url = new URL(ALPS_PUBLIC_LOCATIONS_ENDPOINT);
+  url.searchParams.set("q", q);
+  return url.toString();
+}
+
+function safeVendorUrl(
+  input: unknown, path: "quote" | "vehicle",
+  query: AlpsPublicQuoteQuery, vehicleId?: number,
+): boolean {
+  if (typeof input !== "string" || input.length > 4096) return false;
+  try {
+    const url = new URL(input);
+    if (url.origin !== "https://booking.alps2alps.com" ||
+      (path === "quote" && !["/book/quick-search", "/booking/quick-search"].includes(url.pathname)) ||
+      (path === "vehicle" && !["/book/quick-checkout", "/booking/quick-checkout"].includes(url.pathname)))
+      return false;
+    if (url.searchParams.get("from") !== query.from ||
+      url.searchParams.get("to") !== query.to ||
+      url.searchParams.get("date") !== query.date ||
+      url.searchParams.get("time") !== query.time) return false;
+    if (path === "vehicle" && url.searchParams.get("vehicle") !== String(vehicleId)) return false;
+    return true;
+  } catch { return false; }
+}
+
+/** Strict response normalization, discard booking_url and quote_url values. */
 export function parseAlpsPublicQuote(
-  body: unknown,
-  query: AlpsPublicQuoteQuery,
+  body: unknown, query: AlpsPublicQuoteQuery,
 ): AlpsPublicQuoteResult {
   const root = record(body);
   const route = record(root?.["route"]);
   const outbound = record(root?.["outbound"]);
   const passengers = record(root?.["passengers"]);
   const extras = record(outbound?.["luggage"]);
-  if (!root || !route || !outbound || !passengers ||
-    root["currency"] !== "EUR" ||
-    route["from_code"] !== ALPS_PREVIEW_ROUTE.from ||
-    route["to_code"] !== ALPS_PREVIEW_ROUTE.to ||
+  const fromName = safeLabel(route?.["from"]);
+  const toName = safeLabel(route?.["to"]);
+  if (!root || !route || !outbound || !passengers || !fromName || !toName ||
+    root["currency"] !== query.currency ||
+    route["from_code"] !== query.from || route["to_code"] !== query.to ||
     passengers["adults"] !== query.passengers ||
     !Array.isArray(outbound["vehicles"])) return { status: "malformed_response" };
   const pickup = outbound["pick_up_date_time"];
-  const requestedPickup = `${query.date} ${query.time}:00`;
-  // Provider must confirm the requested pickup rather than a calculated flight time.
-  if (pickup !== requestedPickup) return { status: "malformed_response" };
-  const providedLuggage = within(extras?.["normal_suitcases"], 100);
-  const providedSkis = within(extras?.["ski_bags"], 100);
-  // Display what provider actually quoted, even if it differs from our input.
-  if (providedLuggage === null || providedSkis === null) {
+  if (pickup !== `${query.date} ${query.time}:00`) return { status: "malformed_response" };
+  const luggage = within(extras?.["normal_suitcases"]);
+  const skiBags = within(extras?.["ski_bags"]);
+  // No silent default changes: ensure the quoted extras match the chosen inputs.
+  if (luggage !== query.luggage || skiBags !== query.skiBags) {
     return { status: "malformed_response" };
   }
-  const results: AlpsPublicOffer[] = [];
+
+  const offers: AlpsPublicOffer[] = [];
+  let vehicleUrlsPresent = 0;
+  const seen = new Set<number>();
   for (const raw of outbound["vehicles"].slice(0, 100)) {
     const item = record(raw);
     if (!item || item["offer_code"] !== "requested") continue;
-    const id = within(item["vehicle_type_id"], 100000);
-    const label = item["name"];
-    const price = priceInEuros(item["price"]);
-    if (id === null || typeof label !== "string" || !label.trim() ||
-      label.length > 100 || !price) continue;
-    results.push({
-      id: `public-vehicle-${id}`,
-      vehicleLabel: label.trim(),
-      maxPassengers: within(item["max_passengers"]),
-      maxLuggage: within(item["max_luggage"]),
-      price, pickupTime: String(pickup),
-      source: "public_live", actionable: false,
+    const vehicleId = within(item["vehicle_type_id"], 100000);
+    const label = safeLabel(item["name"]);
+    const price = money(item["price"], query.currency);
+    if (vehicleId === null || vehicleId === 0 || !label || !price || seen.has(vehicleId)) continue;
+    const maxPassengers = within(item["max_passengers"]);
+    const maxLuggage = within(item["max_luggage"]);
+    if ((maxPassengers !== null && maxPassengers < query.passengers) ||
+      (maxLuggage !== null && maxLuggage < query.luggage)) continue;
+    seen.add(vehicleId);
+    if (safeVendorUrl(item["booking_url"], "vehicle", query, vehicleId)) vehicleUrlsPresent++;
+    offers.push({
+      id: `public-vehicle-${vehicleId}`,
+      vehicleLabel: label,
+      maxPassengers,
+      maxLuggage,
+      price,
+      pickupTime: String(pickup),
+      source: "public_live",
+      actionable: false,
     });
   }
-  results.sort((a, b) => a.price.minor - b.price.minor || a.id.localeCompare(b.id));
-  if (!results.length) return { status: "no_offers" };
+  offers.sort((a, b) => a.price.minor - b.price.minor || a.id.localeCompare(b.id));
+  if (!offers.length) return { status: "no_offers" };
   return {
-    status: "ok", offers: results,
+    status: "ok",
+    offers,
     pickupTime: String(pickup),
-    luggage: providedLuggage,
-    skiBags: providedSkis,
+    luggage,
+    skiBags,
+    route: { from: fromName, to: toName },
+    linkEvidence: {
+      quoteUrlPresent: safeVendorUrl(root["quote_url"], "quote", query),
+      vehicleUrlsPresent,
+    },
   };
 }
 
-/**
- * Safe to call client-side only from an authenticated preview after a click.
- * The documented API is unauthenticated and CORS-enabled; no credentials or
- * checkout links are involved. Never called automatically on page load.
- */
-export async function fetchAlpsPublicQuote(
-  query: AlpsPublicQuoteQuery,
-  options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
-): Promise<AlpsPublicQuoteResult> {
-  if (!validateAlpsPublicQuery(query)) return { status: "invalid" };
+async function publicJson(url: string, fetchImpl: typeof fetch, timeoutMs: number):
+  Promise<{ status: "ok"; body: unknown } |
+    { status: "timeout" | "network_error" | "rate_limited" | "malformed_response" | "route_unavailable" } |
+    { status: "http_error"; httpStatus: number }> {
   const controller = new AbortController();
-  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 12000, 100), 20000);
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), Math.min(Math.max(timeoutMs, 100), 20000));
   try {
-    const response = await (options.fetchImpl ?? fetch)(buildAlpsPublicQuoteUrl(query), {
+    const response = await fetchImpl(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       mode: "cors",
@@ -158,17 +264,37 @@ export async function fetchAlpsPublicQuote(
     if (response.status === 404 || response.status === 422) return { status: "route_unavailable" };
     if (!response.ok) return { status: "http_error", httpStatus: response.status };
     const len = Number(response.headers.get("content-length"));
-    if (len > 1000000) return { status: "malformed_response" };
-    const body = await response.text();
-    if (body.length > 1000000) return { status: "malformed_response" };
-    let json: unknown;
-    try { json = JSON.parse(body) as unknown; }
+    if (len > MAX_BODY) return { status: "malformed_response" };
+    const raw = await response.text();
+    if (raw.length > MAX_BODY) return { status: "malformed_response" };
+    try { return { status: "ok", body: JSON.parse(raw) as unknown }; }
     catch { return { status: "malformed_response" }; }
-    return parseAlpsPublicQuote(json, query);
   } catch (error) {
     return controller.signal.aborted || (error as { name?: string })?.name === "AbortError"
       ? { status: "timeout" } : { status: "network_error" };
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
+}
+
+export async function fetchAlpsLocations(
+  term: string, options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<AlpsLocationSearchResult> {
+  let url: string;
+  try { url = buildAlpsLocationSearchUrl(term); }
+  catch { return { status: "invalid" }; }
+  const response = await publicJson(url, options.fetchImpl ?? fetch, options.timeoutMs ?? 10000);
+  if (response.status !== "ok") return response.status === "route_unavailable"
+    ? { status: "http_error", httpStatus: 404 } : response;
+  const locations = parseAlpsLocations(response.body);
+  return locations ? { status: "ok", locations } : { status: "malformed_response" };
+}
+
+export async function fetchAlpsPublicQuote(
+  query: AlpsPublicQuoteQuery,
+  options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<AlpsPublicQuoteResult> {
+  if (!validateAlpsPublicQuery(query)) return { status: "invalid" };
+  const response = await publicJson(
+    buildAlpsPublicQuoteUrl(query), options.fetchImpl ?? fetch, options.timeoutMs ?? 12000,
+  );
+  return response.status === "ok" ? parseAlpsPublicQuote(response.body, query) : response;
 }
