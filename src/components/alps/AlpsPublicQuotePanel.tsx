@@ -219,7 +219,7 @@ export function AlpsPublicQuotePanel() {
         <p className="text-xs text-muted-foreground">
           Pickup time is interpreted literally (not as a flight arrival time).
           Children, return journeys and seats are not yet supported in this controlled test.
-          Ski bags and suitcases are transmitted as separate values.
+          Alps2Alps applies seasonal baggage rules: ski bags are supported in winter but may be excluded in summer.
         </p>
         <button type="submit" disabled={busy || !from || !to || from.code === to.code ||
             (catalog?.status === "ok" && !alpsCatalogAllowsPair(catalog.catalog, from.code, to.code))}
