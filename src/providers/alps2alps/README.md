@@ -132,6 +132,44 @@ global Alps2Alps outage. To isolate B2B network failure further, hosting
 logs or provider network allowlisting may be needed. **Do not rotate API
 secrets solely because a fetch failed.**
 
+
+## Dynamic location and quote tests (6 Nov 2026)
+
+The authenticated, noindex `/alps-preview` now includes a full **Public API
+quote tester above the separate B2B Sandbox test**:
+- Enter at least two characters and click **Find locations** for either
+  endpoint. Each click uses the official unauthenticated,
+  rate-limited `GET /api/public/v1/locations/search?q=...` endpoint.
+  Select only a provider-returned result. Country and location type are
+  displayed because some names match more than one location code.
+  Both endpoints can be swapped; invalid or same-place combinations cannot
+  be quoted.
+- Choose Alpine-local pickup date/time, 1–16 adults, 0–8 suitcases,
+  0–8 ski/snowboard bags, and EUR / GBP / USD. The public quote request
+  remains an explicit click and a `GET /transfer-options` call only;
+  `is_flight=0` treats the entered time as literal local pickup, not
+  flight arrival. Baggage is sent explicitly, bypassing seasonal defaults.
+- Validate the exact vendor-echoed location codes, currency, passenger count,
+  pickup time, suitcases and ski bags. Unsupported routes show
+  `route_unavailable`; no made-up quote is ever displayed. For currencies
+  other than EUR, values can change because of exchange-rate updates.
+- Results remain **only in React state**, are cleared when search fields
+  change, and use the provider's validated price and capacity attributes.
+  The parser checks only whether returned vendor URLs have a known,
+  first-party structure and match the queried route/date/selected vehicle.
+  It returns the existence/number of matching links but **does not
+  expose, store, follow, click, or construct** any booking URLs.
+- No key, secret, affiliate `pc`/`promo`, backend order, or checkout action
+  is used. External rate limits apply; search is manual, never automatic
+  typeahead polling. The commercial permission and commission attribution
+  questions for Laura remain open; **do not send until testing is complete**.
+
+Public API technical reference:
+https://www.alps2alps.com/developers/public-api/
+
+The existing fixed-route **B2B Sandbox** controls remain separate and may
+continue to show `network_error` at `POST /token` in Lovable hosting.
+
 ## Pending verification / questions for Laura
 
 1. Is the public quotes endpoint suitable for a commercial comparison site,
