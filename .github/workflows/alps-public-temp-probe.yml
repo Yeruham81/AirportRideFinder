@@ -22,4 +22,22 @@ jobs:
           echo "Public GET /transfer-options, no credentials, no booking endpoints"
           curl -sS --max-time 18 --connect-timeout 7 \
             'https://booking.alps2alps.com/api/public/v1/transfer-options?from=airport-1&to=resort-11&date=2026-12-20&time=14%3A30&adults=2&is_flight=0&currency=EUR' \
-            -o /dev/null -w "Public quotes HTTP status: %{http_code}; curl exit: %{exitcode}; TLS verify: %{ssl_verify_result}\n" || true
+            -o /tmp/alps_public_quote.json -w "Public quotes HTTP status: %{http_code}; curl exit: %{exitcode}; TLS verify: %{ssl_verify_result}\n" || true
+          python3 - <<'PY'
+          import json
+          try:
+              with open("/tmp/alps_public_quote.json") as f: body = json.load(f)
+              outbound = body.get("outbound") or {}
+              extras = outbound.get("luggage") or {}
+              print("Public currency:", body.get("currency"))
+              print("Public route codes:", (body.get("route") or {}).get("from_code"), (body.get("route") or {}).get("to_code"))
+              print("Public pickup time:", outbound.get("pick_up_date_time"))
+              print("Public adult count:", (body.get("passengers") or {}).get("adults"))
+              print("Public luggage keys:", sorted(extras.keys()))
+              vehicles = outbound.get("vehicles") or []
+              print("Public vehicle count:", len(vehicles))
+              print("Public offer codes:", sorted(set(v.get("offer_code", "") for v in vehicles if isinstance(v, dict))))
+              if vehicles: print("Public first vehicle field names:", sorted(vehicles[0].keys()))
+          except Exception as e:
+              print("Public shape unavailable:", type(e).__name__)
+          PY
