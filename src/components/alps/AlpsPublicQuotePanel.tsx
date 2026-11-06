@@ -232,13 +232,9 @@ export function AlpsPublicQuotePanel() {
         <div className="mt-6 space-y-3">
           {result.bagAdjustment && (
             <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              <strong>Ski bags were not included in the provider's quote.</strong>{" "}
-              You requested {result.bagAdjustment.requestedSkiBags} ski/snowboard{" "}
-              {result.bagAdjustment.requestedSkiBags === 1 ? "bag" : "bags"}, but
-              Alps2Alps quoted 0. Prices below are for <strong>0 ski bags only</strong>,
-              and the search field has been adjusted to 0 automatically.
-              If you need to travel with ski equipment, confirm acceptance and any
-              additional charges with Alps2Alps before relying on these prices.
+              <strong>Ski bags excluded:</strong>{" "}
+              Alps2Alps quoted 0 of the {result.bagAdjustment.requestedSkiBags} requested.
+              Prices exclude ski bags; confirm transport and any extra fees with the provider.
             </div>
           )}
           <div role="status" className="rounded-lg border border-teal/20 bg-teal-soft/40 p-4 text-sm">
