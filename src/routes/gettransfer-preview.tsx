@@ -33,7 +33,14 @@ const ERROR_LABELS: Record<string, string> = {
   http_error: "The sandbox service returned an unexpected response.",
   malformed_response: "The sandbox response could not be verified.",
   timeout: "The sandbox did not respond before the timeout.",
-  network_error: "The sandbox connection could not be completed.",
+  network_error: "The hosting runtime could not complete the sandbox connection. The underlying cause was not exposed by the runtime.",
+  dns_error: "The hosting server could not resolve the sandbox hostname (DNS). Check DNS and outbound connectivity in the deployment environment.",
+  tls_error: "TLS/certificate negotiation with the sandbox failed. Check the hosting environment and the provider certificate.",
+  connect_timeout: "Connection to the sandbox timed out before an HTTP response was received.",
+  connection_refused: "The sandbox host refused the TCP connection.",
+  connection_reset: "The remote host or network closed the connection unexpectedly.",
+  network_unreachable: "The hosting runtime could not reach the sandbox network.",
+  redirect_blocked: "The sandbox responded with an HTTP redirect. For security, the integration does not follow redirects with the API token.",
 };
 
 function GetTransferSandboxPreview() {

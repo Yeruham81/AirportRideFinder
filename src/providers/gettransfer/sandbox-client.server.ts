@@ -2,9 +2,11 @@
  * Server-only GetTransfer SANDBOX diagnostics client (Phase 2A).
  * - Sandbox host only (gtrbox.org), GET /route_info only. No other methods/endpoints.
  * - Token comes from the caller (read from process.env server-side); never logged or returned.
- * - Not wired into any route, server function, adapter registry or UI.
+ * - Used only by the authenticated, manual private preview and the developer script.
+ * - No public adapter registration, production requests, bookings or redirects.
  */
 import { buildRouteInfoUrl, GETTRANSFER_SANDBOX_HOST, parseRouteInfo, type RouteInfoDiagnostics, type RouteInfoQuery } from "./route-info";
+import { classifyGetTransferTransportFailure, type GetTransferTransportFailure } from "./network-diagnostics";
 
 export const TOKEN_ENV_NAME = "GETTRANSFER_SANDBOX_TOKEN";
 
@@ -16,8 +18,8 @@ export type SandboxResult =
   | { status: "rate_limited"; httpStatus: 429; retryAfterSeconds: number | null }
   | { status: "http_error"; httpStatus: number }
   | { status: "malformed_response"; httpStatus: number }
-  | { status: "timeout" }
-  | { status: "network_error" };
+  | { status: "timeout" | "redirect_blocked" }
+  | { status: GetTransferTransportFailure };
 
 export interface SandboxOptions {
   token: string | undefined;
@@ -46,16 +48,20 @@ export async function sandboxRouteInfo(query: RouteInfoQuery, opts: SandboxOptio
       method: "GET",
       headers: { "X-ACCESS-TOKEN": token, Accept: "application/json" },
       signal: controller.signal,
-      redirect: "error",
+      // Do not follow redirects. Manual mode identifies a 3xx separately from
+      // DNS/TLS failures, without exposing a redirect target or credential.
+      redirect: "manual",
     });
   } catch (err) {
     return controller.signal.aborted || (err as { name?: string })?.name === "AbortError"
       ? { status: "timeout" }
-      : { status: "network_error" };
+      : { status: classifyGetTransferTransportFailure(err) };
   } finally {
     clearTimeout(timer);
   }
 
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400))
+    return { status: "redirect_blocked" };
   if (res.status === 401) return { status: "unauthorized", httpStatus: 401 };
   if (res.status === 403) return { status: "forbidden", httpStatus: 403 };
   if (res.status === 429) {
