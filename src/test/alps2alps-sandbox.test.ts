@@ -125,6 +125,7 @@ describe("Alps2Alps sandbox-only server transport", () => {
     expect(r.status).toBe("ok");
     if (r.status !== "ok") throw new Error();
     expect(r.offers).toHaveLength(2);
+    expect(r.vehicleCatalog).toBe("available");
     const urls = f.mock.calls.map((call) => call[0]);
     expect(urls).toEqual([
       "https://sandbox.amitours.com/api/v2/token",
@@ -188,6 +189,42 @@ describe("Alps2Alps sandbox-only server transport", () => {
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error();
     expect(result.offers[0]?.vehicleLabel).toBe("Vehicle type 2");
+    expect(result.vehicleCatalog).toBe("unavailable");
     expect(result.offers[0]?.maxPassengers).toBeNull();
   });
+  it("reports the failed transport stage without leaking errors or credentials", async () => {
+    const failedTokenFetch = vi.fn(async () => {
+      throw new TypeError("connect ECONNREFUSED test-secret-not-a-real-secret");
+    });
+    const tokenFailure = await fetchAlpsSandboxQuote(query, {
+      env: creds, fetchImpl: failedTokenFetch as unknown as typeof fetch,
+    });
+    expect(tokenFailure).toEqual({ status: "network_error", stage: "token" });
+    expect(JSON.stringify(tokenFailure)).not.toContain("ECONNREFUSED");
+
+    const transferFailureFetch = vi.fn(async (url: string) => {
+      if (url.endsWith("/token")) return Response.json({ token: "test-only-token-456789" });
+      if (url.endsWith("/vehicles")) return Response.json(vehicles);
+      throw new TypeError("unreachable origin");
+    });
+    const quoteFailure = await fetchAlpsSandboxQuote(query, {
+      env: creds, fetchImpl: transferFailureFetch as unknown as typeof fetch,
+    });
+    expect(quoteFailure).toEqual({ status: "network_error", stage: "transfer" });
+    expect(JSON.stringify(quoteFailure)).not.toContain("unreachable origin");
+  });
+
+  it("labels unauthorized and malformed token failures as authentication step", async () => {
+    const authReject = await fetchAlpsSandboxQuote(query, {
+      env: creds,
+      fetchImpl: vi.fn(async () => new Response(null, { status: 401 })) as unknown as typeof fetch,
+    });
+    expect(authReject).toEqual({ status: "unauthorized", stage: "token" });
+    const malformed = await fetchAlpsSandboxQuote(query, {
+      env: creds,
+      fetchImpl: vi.fn(async () => Response.json({ token: "short" })) as unknown as typeof fetch,
+    });
+    expect(malformed).toEqual({ status: "malformed_response", stage: "token" });
+  });
+
 });
