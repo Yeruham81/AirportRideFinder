@@ -15,6 +15,7 @@ jobs:
           import json, urllib.parse, urllib.request
           targets = [
             ("catalog", "https://booking.alps2alps.com/api/resource/destinations"),
+            ("routes", "https://booking.alps2alps.com/api/resource/routes"),
             ("search_Ge", "https://booking.alps2alps.com/api/public/v1/locations/search?q=Ge"),
             ("quote_winter", "https://booking.alps2alps.com/api/public/v1/transfer-options?from=airport-1&to=resort-11&date=2026-11-13&time=14%3A00&adults=2&luggage=2&ski_bags=0&ski=0&is_flight=0&currency=EUR"),
             ("quote_summer_skis", "https://booking.alps2alps.com/api/public/v1/transfer-options?from=airport-1&to=resort-11&date=2027-07-22&time=14%3A00&adults=2&luggage=2&ski_bags=2&ski=1&is_flight=0&currency=GBP"),
@@ -26,6 +27,10 @@ jobs:
                 raw = response.read(900000)
                 print(title, "http", response.status, "content_type", response.headers.get("content-type"), "bytes",len(raw), "cors", response.headers.get("access-control-allow-origin"))
               j = json.loads(raw)
+              if title == "routes":
+                print("routes_top_level", type(j).__name__, "count",len(j) if isinstance(j,list) else len(j.keys()) if isinstance(j,dict) else None)
+                if isinstance(j,dict): print("routes_keys", list(j)[:12])
+                if isinstance(j,list) and j: print("routes_first_keys",sorted(j[0]) if isinstance(j[0],dict) else type(j[0]).__name__, "first_types",{k:type(v).__name__ for k,v in j[0].items()} if isinstance(j[0],dict) else {})
               if title == "catalog":
                 print("catalog_top_level", type(j).__name__, "count",len(j) if isinstance(j,list) else len(j.keys()) if isinstance(j,dict) else None)
                 if isinstance(j,dict): print("catalog_keys", list(j)[:12])
