@@ -47,6 +47,26 @@ describe("Transferise route and quote validation", () => {
     expect(resolveTransferisePlace({ ok: false, results: airport.results }, lookup)).toBeNull();
   });
 
+  it("resolves Rixos by either documented or public catalogue name without selecting another property", () => {
+    const lookup = TRANSFERISE_PREVIEW_ROUTES[0]!.to;
+    // The catalogue name does not contain 'Antalya', so the search must use
+    // the common stem rather than the documentation's longer label.
+    const publicHotel = { id: "hotel:987", kind: "hotel", name: "Rixos Downtown Hotel" };
+    expect(publicHotel.name.toLowerCase()).toContain(lookup.query.toLowerCase());
+    expect(resolveTransferisePlace({ ok: true, results: [
+      publicHotel,
+      { id: "hotel:988", kind: "hotel", name: "Rixos Premium Belek" },
+      { id: "hotel:989", kind: "hotel", name: "Rixos Downtown Hotel Annex" },
+      { id: "destination:987", kind: "destination", name: "Rixos Downtown Hotel" },
+    ] }, lookup)?.id).toBe("hotel:987");
+    expect(resolveTransferisePlace(hotel, lookup)?.id).toBe("hotel:321");
+    // Conflicting provider hotel records still require resolution; never
+    // silently take the first returned ID just because both names are known.
+    expect(resolveTransferisePlace({ ok: true, results: [
+      publicHotel, ...hotel.results,
+    ] }, lookup)).toBeNull();
+  });
+
   it("preserves the API price in minor units without markup and preserves attribution", () => {
     const result = parseTransferiseQuote(quote, INPUT);
     expect(result.kind).toBe("ok");
