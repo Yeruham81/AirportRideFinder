@@ -2,8 +2,8 @@
 import { classifyGetTransferTransportFailure, type GetTransferTransportFailure } from "@/providers/gettransfer/network-diagnostics";
 import {
   TRANSFERISE_ENDPOINT, isTransferiseSandboxKey, parseTransferiseQuote,
-  prepareTransferiseSearch, resolveTransferisePlace, type TransferisePreviewInput,
-  type TransferisePreviewOffer,
+  prepareTransferiseSearch, inspectTransferisePlace, verifiedTransferiseQuoteDestination,
+  type TransferisePreviewInput, type TransferisePreviewOffer, type TransferiseLocationDiagnostic,
 } from "./preview";
 
 export type TransferiseFailure = GetTransferTransportFailure | "timeout" | "redirect_blocked" |
@@ -12,10 +12,10 @@ export type TransferiseFailure = GetTransferTransportFailure | "timeout" | "redi
 
 export type TransferiseSandboxResult =
   | { kind: "ok"; offers: TransferisePreviewOffer[]; bookingUrl: string | null; routeLabel: string; retrievedAt: string }
-  | { kind: "error"; code: TransferiseFailure };
+  | { kind: "error"; code: TransferiseFailure; location?: TransferiseLocationDiagnostic };
 
 class SafeFailure extends Error {
-  constructor(readonly code: TransferiseFailure) { super(code); }
+  constructor(readonly code: TransferiseFailure, readonly location?: TransferiseLocationDiagnostic) { super(code); }
 }
 
 export async function searchTransferiseSandbox(input: TransferisePreviewInput, options: {
@@ -69,25 +69,40 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
   }
 
   try {
-    // Resolve the real provider IDs on each manual search. Never guess them
-    // from the docs or forward names supplied by an unauthenticated browser.
+    // Prefer real places results. Rixos also has an explicit hotel ID in the
+    // provider console example, but a fallback quote must verify its identity.
     const fromData = await request({ action: "places", q: route.from.query });
-    const from = resolveTransferisePlace(fromData, route.from);
-    if (!from) throw new SafeFailure("location_unresolved");
+    const fromCheck = inspectTransferisePlace(fromData, route.from, key);
+    const from = fromCheck.place;
+    const diagnostic = (check: typeof fromCheck, stage: "pickup" | "destination", query: string): TransferiseLocationDiagnostic => ({
+      stage, query, reason: check.reason, returnedCount: check.returnedCount,
+      matchingCount: check.matchingCount, candidates: check.candidates,
+    });
+    if (!from) throw new SafeFailure("location_unresolved", diagnostic(fromCheck, "pickup", route.from.query));
     const toData = await request({ action: "places", q: route.to.query });
-    const to = resolveTransferisePlace(toData, route.to);
-    if (!to) throw new SafeFailure("location_unresolved");
+    const toCheck = inspectTransferisePlace(toData, route.to, key);
+    const destinationDiagnostic = diagnostic(toCheck, "destination", route.to.query);
+    const fallbackId = toCheck.reason !== "invalid_response" ? route.to.documentedQuoteId : undefined;
+    const toId = toCheck.place?.id ?? fallbackId;
+    if (!toId) throw new SafeFailure("location_unresolved", destinationDiagnostic);
     const body = await request({
-      action: "quote", from: from.id, to: to.id, date: input.date, time: input.time,
+      action: "quote", from: from.id, to: toId, date: input.date, time: input.time,
       passengers: String(input.passengers), currency: input.currency, lang: "en",
+    });
+    const toLabel = toCheck.place?.label ?? verifiedTransferiseQuoteDestination(body, route.to);
+    if (!toLabel) throw new SafeFailure("location_unresolved", {
+      ...destinationDiagnostic, reason: "quote_destination_unverified",
     });
     const parsed = parseTransferiseQuote(body, input);
     if (parsed.kind !== "ok") throw new SafeFailure(parsed.kind);
     // Defend against an upstream response reflecting the key in its URL.
     if (parsed.bookingUrl?.includes(key)) throw new SafeFailure("malformed_response");
-    return { ...parsed, routeLabel: `${from.label} → ${to.label}`, retrievedAt: new Date().toISOString() };
+    return { ...parsed, routeLabel: `${from.label} → ${toLabel}`, retrievedAt: new Date().toISOString() };
   } catch (error) {
-    if (error instanceof SafeFailure) return { kind: "error", code: error.code };
+    if (error instanceof SafeFailure) return {
+      kind: "error", code: error.code, ...(error.location ? { location: error.location } : {}),
+    };
     return { kind: "error", code: controller.signal.aborted ? "timeout" : classifyGetTransferTransportFailure(error) };
   } finally { clearTimeout(timer); }
 }
+

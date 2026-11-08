@@ -12,6 +12,8 @@ interface PlaceLookup {
   names: readonly string[];
   iata?: string;
   kind?: string;
+  /** Explicit provider-console example; usable only with quote-name verification. */
+  documentedQuoteId?: string;
 }
 
 export const TRANSFERISE_PREVIEW_ROUTES: readonly {
@@ -23,7 +25,11 @@ export const TRANSFERISE_PREVIEW_ROUTES: readonly {
     // The public hotel catalogue says "Rixos Downtown Hotel"; the docs use
     // "Rixos Downtown Antalya". Search their common stem, then match only a
     // unique hotel with one of these verified names (never a fuzzy first hit).
-    to: { query: "Rixos Downtown", kind: "hotel", names: ["Rixos Downtown Hotel", "Rixos Downtown Antalya"] },
+    to: {
+      query: "Rixos Downtown", kind: "hotel",
+      names: ["Rixos Downtown Hotel", "Rixos Downtown Antalya"],
+      documentedQuoteId: "hotel:17370",
+    },
   },
   {
     id: "antalya-kemer", label: "Antalya Airport → Kemer",
@@ -68,24 +74,69 @@ function normalized(value: string) {
 
 export interface TransferisePlace { id: string; label: string }
 
-/** Never assume an ID from a documentation example or take the first fuzzy hit. */
-export function resolveTransferisePlace(body: unknown, lookup: PlaceLookup): TransferisePlace | null {
+export interface TransferisePlaceInspection {
+  place: TransferisePlace | null;
+  reason: "resolved" | "invalid_response" | "empty_results" | "no_exact_match" | "ambiguous";
+  returnedCount: number;
+  matchingCount: number;
+  candidates: { id: string; name: string; kind: string }[];
+}
+
+/** Inspect only bounded location fields, never return the raw authenticated response. */
+export function inspectTransferisePlace(
+  body: unknown, lookup: PlaceLookup, hiddenValue?: string,
+): TransferisePlaceInspection {
   const data = record(body);
-  if (data?.["ok"] !== true || !Array.isArray(data["results"])) return null;
+  if (data?.["ok"] !== true || !Array.isArray(data["results"])) return {
+    place: null, reason: "invalid_response", returnedCount: 0, matchingCount: 0, candidates: [],
+  };
   const matches = new Map<string, TransferisePlace>();
+  const candidates: TransferisePlaceInspection["candidates"] = [];
+  const safeText = (value: unknown) => {
+    const result = text(value);
+    return result && (!hiddenValue || !result.includes(hiddenValue)) ? result : null;
+  };
   for (const value of data["results"].slice(0, 100)) {
     const place = record(value);
     if (!place) continue;
     const id = text(place["id"], 100);
-    const name = text(place["name"]);
+    const name = safeText(place["name"]);
     if (!id || !/^[a-z][a-z_]{0,24}:[1-9]\d{0,14}$/.test(id) || !name) continue;
+    if (candidates.length < 6) candidates.push({ id, name, kind: safeText(place["kind"]) ?? "unknown" });
     if (lookup.kind && place["kind"] !== lookup.kind) continue;
     const matchesLookup = lookup.iata
       ? place["kind"] === "airport" && place["iata"] === lookup.iata
       : lookup.names.some((candidate) => normalized(candidate) === normalized(name));
-    if (matchesLookup) matches.set(id, { id, label: text(place["label"]) ?? name });
+    if (matchesLookup) matches.set(id, { id, label: safeText(place["label"]) ?? name });
   }
-  return matches.size === 1 ? [...matches.values()][0]! : null;
+  return {
+    place: matches.size === 1 ? [...matches.values()][0]! : null,
+    reason: matches.size === 1 ? "resolved" : matches.size > 1 ? "ambiguous" :
+      data["results"].length === 0 ? "empty_results" : "no_exact_match",
+    returnedCount: data["results"].length, matchingCount: matches.size, candidates,
+  };
+}
+
+/** Ordinary place resolution still requires one exact, unique provider record. */
+export function resolveTransferisePlace(body: unknown, lookup: PlaceLookup): TransferisePlace | null {
+  return inspectTransferisePlace(body, lookup).place;
+}
+
+export interface TransferiseLocationDiagnostic {
+  stage: "pickup" | "destination";
+  query: string;
+  reason: TransferisePlaceInspection["reason"] | "quote_destination_unverified";
+  returnedCount: number;
+  matchingCount: number;
+  candidates: TransferisePlaceInspection["candidates"];
+}
+
+/** A documented fallback ID is never trusted unless the quote echoes the expected property. */
+export function verifiedTransferiseQuoteDestination(body: unknown, lookup: PlaceLookup): string | null {
+  const data = record(body);
+  const name = text(data?.["to"]);
+  if (data?.["ok"] !== true || !name || !lookup.names.some((candidate) => normalized(candidate) === normalized(name))) return null;
+  return name;
 }
 
 export interface TransferisePreviewOffer {
@@ -159,3 +210,4 @@ export function parseTransferiseQuote(body: unknown, input: TransferisePreviewIn
     bookingUrl: safeTransferiseSandboxLink(data["booking_url"], data["test"] === true),
   };
 }
+

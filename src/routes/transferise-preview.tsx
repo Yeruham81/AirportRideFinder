@@ -27,7 +27,7 @@ const ERRORS: Record<string, string> = {
   unauthorized: "Transferise rejected the sandbox key (401).",
   forbidden: "Transferise denied this request (403). Check the key's domain settings.",
   rate_limited: "Transferise's request limit has been reached (429).",
-  location_unresolved: "The API did not return a unique matching airport or destination. Try another test route.",
+  location_unresolved: "The requested place could not be verified. See the location diagnostic below.",
   malformed_response: "The API response could not be verified for this search.",
   api_rejected: "Transferise rejected this search. Try a later pickup or a different route.",
   invalid: "Choose a valid future pickup, route, currency and passenger count.",
@@ -86,7 +86,7 @@ function TransferisePreview() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · Location check v3</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Transferise — API price preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sandbox quotes for one-way transfers in Türkiye. Prices come directly from the API.
@@ -171,9 +171,25 @@ function TransferisePreview() {
             {quote?.kind === "rate_limited" && <p role="alert">The preview request limit has been reached. Please try again later.</p>}
             {quote?.kind === "authentication_required" && <p role="alert">Your session expired. Lock the preview and sign in again.</p>}
             {(quote?.kind === "disabled" || quote?.kind === "unconfigured") && <p role="status">The preview is disabled or not configured.</p>}
-            {quote?.kind === "error" && <p role="alert" className="rounded-xl border bg-card p-5 text-sm">
-              {ERRORS[quote.code] ?? "The sandbox connection could not be completed."} Diagnostic: <code>{quote.code}</code>.
-            </p>}
+            {quote?.kind === "error" && <div role="alert" className="space-y-3 rounded-xl border bg-card p-5 text-sm">
+              <p>{ERRORS[quote.code] ?? "The sandbox connection could not be completed."} Diagnostic: <code>{quote.code}</code>.</p>
+              {quote.location && <details open className="rounded-lg border bg-muted/30 p-3">
+                <summary className="font-semibold">Location diagnostic (v3)</summary>
+                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt>Stage</dt><dd>{quote.location.stage}</dd>
+                  <dt>Search</dt><dd>{quote.location.query}</dd>
+                  <dt>Reason</dt><dd><code>{quote.location.reason}</code></dd>
+                  <dt>Results returned</dt><dd>{quote.location.returnedCount}</dd>
+                  <dt>Exact matches</dt><dd>{quote.location.matchingCount}</dd>
+                </dl>
+                {quote.location.candidates.length > 0 && <ul className="mt-3 space-y-1 text-xs">
+                  {quote.location.candidates.map((place, index) => <li key={`${place.id}-${index}`}>
+                    {place.name} — <code>{place.id}</code> ({place.kind})
+                  </li>)}
+                </ul>}
+                <p className="mt-2 text-xs text-muted-foreground">Only bounded place fields are shown; no API key, headers or raw response.</p>
+              </details>}
+            </div>}
             {quote?.kind === "request_failed" && <p role="alert">The preview request could not be completed. Please retry.</p>}
           </div>
         </>
@@ -182,3 +198,4 @@ function TransferisePreview() {
     </div>
   );
 }
+

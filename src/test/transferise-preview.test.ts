@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   isTransferiseSandboxKey, parseTransferiseQuote, prepareTransferiseSearch,
-  resolveTransferisePlace, safeTransferiseSandboxLink, TRANSFERISE_PREVIEW_ROUTES,
+  resolveTransferisePlace, inspectTransferisePlace, safeTransferiseSandboxLink, TRANSFERISE_PREVIEW_ROUTES,
   type TransferisePreviewInput,
 } from "@/providers/transferise/preview";
 import { searchTransferiseSandbox } from "@/providers/transferise/sandbox-client.server";
@@ -76,6 +76,25 @@ describe("Transferise route and quote validation", () => {
     expect(result.bookingUrl).toBe(LINK);
   });
 
+  it("explains empty, nonmatching and ambiguous places without returning keys or raw fields", () => {
+    const lookup = TRANSFERISE_PREVIEW_ROUTES[0]!.to;
+    expect(inspectTransferisePlace({ ok: true, results: [] }, lookup).reason).toBe("empty_results");
+    expect(inspectTransferisePlace({ ok: true, results: [{ id: "hotel:17", kind: "hotel", name: "Different Hotel" }] }, lookup).reason)
+      .toBe("no_exact_match");
+    const ambiguous = inspectTransferisePlace({ ok: true, results: [
+      { id: "hotel:17", kind: "hotel", name: "Rixos Downtown Hotel", secret_field: KEY },
+      { id: "hotel:18", kind: "hotel", name: "Rixos Downtown Antalya", headers: { key: KEY } },
+    ] }, lookup, KEY);
+    expect(ambiguous.reason).toBe("ambiguous");
+    expect(ambiguous.matchingCount).toBe(2);
+    expect(ambiguous.candidates).toHaveLength(2);
+    expect(JSON.stringify(ambiguous)).not.toContain(KEY);
+    const reflected = inspectTransferisePlace({ ok: true, results: [
+      { id: "hotel:17", name: KEY, kind: "hotel" },
+    ] }, lookup, KEY);
+    expect(JSON.stringify(reflected)).not.toContain(KEY);
+  });
+
   it("hides invalid prices, per-person fares, wrong currencies, duplicate IDs and small vehicles", () => {
     const result = parseTransferiseQuote({ ...quote, vehicles: [
       car, car, { ...car, id: 61, price: null }, { ...car, id: 62, price: -1 },
@@ -143,8 +162,55 @@ describe("Transferise sandbox transport", () => {
   it("stops on an unresolved location instead of requesting an unrelated route", async () => {
     const f = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: true, results: [] }));
     expect(await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW }))
-      .toEqual({ kind: "error", code: "location_unresolved" });
+      .toMatchObject({ kind: "error", code: "location_unresolved", location: { stage: "pickup", reason: "empty_results" } });
     expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the provider's documented Rixos ID only when its quote verifies the destination", async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(airport))
+      .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
+      .mockResolvedValueOnce(Response.json({ ...quote, to: "Rixos Downtown Antalya" }));
+    const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") throw new Error();
+    expect(result.offers[0]?.price.minor).toBe(2504);
+    expect(result.routeLabel).toBe("Antalya Airport (AYT) → Rixos Downtown Antalya");
+    const requested = new URL(String(f.mock.calls[2]![0]));
+    expect(requested.searchParams.get("to")).toBe("hotel:17370");
+    expect(requested.searchParams.get("from")).toBe("airport:456");
+    expect(f).toHaveBeenCalledTimes(3);
+  });
+
+  it("withholds every price and booking URL if the documented-ID quote identifies a different or missing destination", async () => {
+    for (const destination of ["Different Hotel", undefined]) {
+      const f = vi.fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json(airport))
+        .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
+        .mockResolvedValueOnce(Response.json({ ...quote, to: destination }));
+      const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
+      expect(result).toMatchObject({ kind: "error", code: "location_unresolved", location: {
+        stage: "destination", reason: "quote_destination_unverified",
+      } });
+      expect(result).not.toHaveProperty("offers");
+      expect(JSON.stringify(result)).not.toContain(LINK);
+      expect(JSON.stringify(result)).not.toContain(KEY);
+    }
+  });
+
+  it("never substitutes the documented hotel ID for the Kemer route or a malformed places response", async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(airport))
+      .mockResolvedValueOnce(Response.json({ ok: true, results: [] }));
+    expect(await searchTransferiseSandbox({ ...INPUT, routeId: "antalya-kemer" }, { key: KEY, fetchImpl: f, now: NOW }))
+      .toMatchObject({ kind: "error", code: "location_unresolved", location: { stage: "destination", reason: "empty_results" } });
+    expect(f).toHaveBeenCalledTimes(2);
+    const malformed = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(airport))
+      .mockResolvedValueOnce(Response.json({ ok: true }));
+    expect(await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: malformed, now: NOW }))
+      .toMatchObject({ kind: "error", code: "location_unresolved", location: { reason: "invalid_response" } });
+    expect(malformed).toHaveBeenCalledTimes(2);
   });
 
   it("never follows redirects with a key, and classifies authentication and DNS errors safely", async () => {
@@ -161,3 +227,4 @@ describe("Transferise sandbox transport", () => {
       .toEqual({ kind: "error", code: "dns_error" });
   });
 });
+
