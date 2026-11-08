@@ -21,10 +21,17 @@ and shared with the other previews. No key is returned to the browser.
 
 1. Open `/transferise-preview`, unlock it, select Antalya Airport → Rixos Downtown
    Antalya with a pickup at least one week ahead, two passengers and EUR.
-2. Submit once. The server resolves both real location IDs with `action=places`,
+2. Submit once. The server resolves real location IDs with `action=places`,
    then calls `action=quote`. Check vehicle names, price/currency and capacity.
    Additional available test routes are Antalya → Kemer and Istanbul → Taksim;
    a route may be unavailable if the API cannot resolve an unambiguous match.
+   For Rixos only, if the name lookup cannot resolve a place, the preview can
+   try `hotel:17370`, explicitly supplied by Transferise's partner-console
+   example. It shows that quote only if its `to` field exactly verifies a known
+   Rixos Downtown property name. The airport is still resolved by IATA, and no
+   arbitrary ID is guessed. If verification fails, prices and the booking URL
+   are withheld. The private v3 diagnostic reports the lookup stage, counts and
+   up to six sanitized place records, never keys, headers or raw responses.
 3. If the response explicitly has `test: true` and returns a valid HTTPS
    `transferise.com` URL, manually open **Open sandbox booking page**. The URL and
    referral parameters are preserved. It is a route link, not a promise that a
@@ -51,3 +58,4 @@ References reviewed on 2026-11-08:
 
 Automated tests mock every response; a real quote requires the user's server-side
 sandbox key and a deployment environment with outbound HTTPS access.
+
