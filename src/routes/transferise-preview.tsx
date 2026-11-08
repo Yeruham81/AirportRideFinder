@@ -86,7 +86,7 @@ function TransferisePreview() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · API check v4</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · API check v5</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Transferise — API price preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sandbox quotes for one-way transfers in Türkiye. Prices come directly from the API.
@@ -184,10 +184,9 @@ function TransferisePreview() {
                 <dt>Provider error code</dt><dd>{quote.request.providerCode ?? "Not supplied"}</dd>
                 {quote.request.fromId && <><dt>Pickup ID</dt><dd><code>{quote.request.fromId}</code></dd></>}
                 {quote.request.toId && <><dt>Destination ID</dt><dd><code>{quote.request.toId}</code></dd></>}
-                <dt>Documented hotel fallback</dt><dd>{quote.request.usedDocumentedId ? "Yes" : "No"}</dd>
               </dl>}
               {quote.location && <details open className="rounded-lg border bg-muted/30 p-3">
-                <summary className="font-semibold">Location diagnostic (v4)</summary>
+                <summary className="font-semibold">Location diagnostic (v5)</summary>
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                   <dt>Stage</dt><dd>{quote.location.stage}</dd>
                   <dt>Search</dt><dd>{quote.location.query}</dd>
@@ -211,5 +210,6 @@ function TransferisePreview() {
     </div>
   );
 }
+
 
 
