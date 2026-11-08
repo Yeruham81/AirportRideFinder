@@ -166,39 +166,56 @@ describe("Transferise sandbox transport", () => {
     expect(f).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the provider's documented Rixos ID only when its quote verifies the destination", async () => {
+  it("resolves the observed Rixos Downtown Antalya Hotel record and quotes its actual API ID", async () => {
+    const actualAirport = { ok: true, results: [{ ...airport.results[0], id: "airport:1" }] };
+    const actualHotel = { ok: true, results: [
+      { id: "hotel:811", kind: "hotel", name: "Rixos Downtown Antalya Hotel" },
+      { id: "hotel:812", kind: "hotel", name: "Rixos Premium Belek" },
+      { id: "hotel:813", kind: "hotel", name: "Rixos Downtown Antalya Hotel Annex" },
+      { id: "destination:811", kind: "destination", name: "Rixos Downtown Antalya Hotel" },
+    ] };
+    expect(inspectTransferisePlace(actualHotel, TRANSFERISE_PREVIEW_ROUTES[0]!.to))
+      .toMatchObject({ reason: "resolved", matchingCount: 1, place: { id: "hotel:811" } });
     const f = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(Response.json(airport))
-      .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
-      .mockResolvedValueOnce(Response.json({ ...quote, to: "Rixos Downtown Antalya" }));
+      .mockResolvedValueOnce(Response.json(actualAirport))
+      .mockResolvedValueOnce(Response.json(actualHotel))
+      .mockResolvedValueOnce(Response.json({ ...quote, to: "Rixos Downtown Antalya Hotel" }));
     const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") throw new Error();
     expect(result.offers[0]?.price.minor).toBe(2504);
-    expect(result.routeLabel).toBe("Antalya Airport (AYT) → Rixos Downtown Antalya");
+    expect(result.routeLabel).toBe("Antalya Airport (AYT) → Rixos Downtown Antalya Hotel");
     const requested = new URL(String(f.mock.calls[2]![0]));
-    expect(requested.searchParams.get("to")).toBe("hotel:17370");
-    expect(requested.searchParams.get("from")).toBe("airport:456");
+    expect(requested.searchParams.get("to")).toBe("hotel:811");
+    expect(requested.searchParams.get("from")).toBe("airport:1");
+    expect(requested.toString()).not.toContain("17370");
     expect(f).toHaveBeenCalledTimes(3);
   });
 
-  it("withholds every price and booking URL if the documented-ID quote identifies a different or missing destination", async () => {
-    for (const destination of ["Different Hotel", undefined]) {
+  it("stops before quoting an empty, unrelated or ambiguous Rixos search without substituting an example ID", async () => {
+    for (const results of [
+      [],
+      [{ id: "hotel:17", kind: "hotel", name: "Different Hotel" }],
+      [
+        { id: "hotel:811", kind: "hotel", name: "Rixos Downtown Antalya Hotel" },
+        { id: "hotel:812", kind: "hotel", name: "Rixos Downtown Antalya Hotel" },
+      ],
+    ]) {
       const f = vi.fn<typeof fetch>()
         .mockResolvedValueOnce(Response.json(airport))
-        .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
-        .mockResolvedValueOnce(Response.json({ ...quote, to: destination }));
+        .mockResolvedValueOnce(Response.json({ ok: true, results }));
       const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
       expect(result).toMatchObject({ kind: "error", code: "location_unresolved", location: {
-        stage: "destination", reason: "quote_destination_unverified",
+        stage: "destination",
       } });
+      expect(f).toHaveBeenCalledTimes(2);
       expect(result).not.toHaveProperty("offers");
       expect(JSON.stringify(result)).not.toContain(LINK);
       expect(JSON.stringify(result)).not.toContain(KEY);
     }
   });
 
-  it("never substitutes the documented hotel ID for the Kemer route or a malformed places response", async () => {
+  it("makes no quote request for unresolved Kemer or a malformed places response", async () => {
     const f = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json(airport))
       .mockResolvedValueOnce(Response.json({ ok: true, results: [] }));
@@ -230,13 +247,13 @@ describe("Transferise sandbox transport", () => {
   it("reports the failed quote status, IDs and safe provider code without exposing the error body", async () => {
     const f = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json(airport))
-      .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
+      .mockResolvedValueOnce(Response.json(hotel))
       .mockResolvedValueOnce(Response.json({ ok: false, error: "route_not_found", message: KEY, debug: { secret: KEY } }, { status: 422 }));
     const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
     expect(result).toMatchObject({ kind: "error", code: "http_error", request: {
       stage: "quote", httpStatus: 422, providerCode: "route_not_found",
-      fromId: "airport:456", toId: "hotel:17370", usedDocumentedId: true,
-    }, location: { stage: "destination", reason: "empty_results" } });
+      fromId: "airport:456", toId: "hotel:321",
+    } });
     expect(f).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(result)).not.toContain(KEY);
     expect(result).not.toHaveProperty("offers");
@@ -266,5 +283,6 @@ describe("Transferise sandbox transport", () => {
       .toMatchObject({ kind: "error", code: "api_rejected", request: { httpStatus: 200, providerCode: "q_too_short" } });
   });
 });
+
 
 

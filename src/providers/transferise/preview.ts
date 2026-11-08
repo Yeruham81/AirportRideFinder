@@ -12,23 +12,19 @@ interface PlaceLookup {
   names: readonly string[];
   iata?: string;
   kind?: string;
-  /** Explicit provider-console example; usable only with quote-name verification. */
-  documentedQuoteId?: string;
 }
 
 export const TRANSFERISE_PREVIEW_ROUTES: readonly {
   id: string; label: string; from: PlaceLookup; to: PlaceLookup;
 }[] = [
   {
-    id: "antalya-rixos", label: "Antalya Airport → Rixos Downtown Antalya",
+    id: "antalya-rixos", label: "Antalya Airport → Rixos Downtown Antalya Hotel",
     from: { query: "Antalya Airport", iata: "AYT", names: ["Antalya Airport", "Antalya Airport (AYT)"] },
-    // The public hotel catalogue says "Rixos Downtown Hotel"; the docs use
-    // "Rixos Downtown Antalya". Search their common stem, then match only a
-    // unique hotel with one of these verified names (never a fuzzy first hit).
+    // The actual places response uses "Rixos Downtown Antalya Hotel".
+    // Match that exact name (or a verified older alias) and use the returned ID.
     to: {
       query: "Rixos Downtown", kind: "hotel",
-      names: ["Rixos Downtown Hotel", "Rixos Downtown Antalya"],
-      documentedQuoteId: "hotel:17370",
+      names: ["Rixos Downtown Antalya Hotel", "Rixos Downtown Hotel", "Rixos Downtown Antalya"],
     },
   },
   {
@@ -125,18 +121,10 @@ export function resolveTransferisePlace(body: unknown, lookup: PlaceLookup): Tra
 export interface TransferiseLocationDiagnostic {
   stage: "pickup" | "destination";
   query: string;
-  reason: TransferisePlaceInspection["reason"] | "quote_destination_unverified";
+  reason: TransferisePlaceInspection["reason"];
   returnedCount: number;
   matchingCount: number;
   candidates: TransferisePlaceInspection["candidates"];
-}
-
-/** A documented fallback ID is never trusted unless the quote echoes the expected property. */
-export function verifiedTransferiseQuoteDestination(body: unknown, lookup: PlaceLookup): string | null {
-  const data = record(body);
-  const name = text(data?.["to"]);
-  if (data?.["ok"] !== true || !name || !lookup.names.some((candidate) => normalized(candidate) === normalized(name))) return null;
-  return name;
 }
 
 export interface TransferisePreviewOffer {
@@ -210,4 +198,5 @@ export function parseTransferiseQuote(body: unknown, input: TransferisePreviewIn
     bookingUrl: safeTransferiseSandboxLink(data["booking_url"], data["test"] === true),
   };
 }
+
 
