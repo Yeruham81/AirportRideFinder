@@ -11,6 +11,7 @@ interface PlaceLookup {
   query: string;
   names: readonly string[];
   iata?: string;
+  kind?: string;
 }
 
 export const TRANSFERISE_PREVIEW_ROUTES: readonly {
@@ -19,7 +20,10 @@ export const TRANSFERISE_PREVIEW_ROUTES: readonly {
   {
     id: "antalya-rixos", label: "Antalya Airport → Rixos Downtown Antalya",
     from: { query: "Antalya Airport", iata: "AYT", names: ["Antalya Airport", "Antalya Airport (AYT)"] },
-    to: { query: "Rixos Downtown Antalya", names: ["Rixos Downtown Antalya"] },
+    // The public hotel catalogue says "Rixos Downtown Hotel"; the docs use
+    // "Rixos Downtown Antalya". Search their common stem, then match only a
+    // unique hotel with one of these verified names (never a fuzzy first hit).
+    to: { query: "Rixos Downtown", kind: "hotel", names: ["Rixos Downtown Hotel", "Rixos Downtown Antalya"] },
   },
   {
     id: "antalya-kemer", label: "Antalya Airport → Kemer",
@@ -75,6 +79,7 @@ export function resolveTransferisePlace(body: unknown, lookup: PlaceLookup): Tra
     const id = text(place["id"], 100);
     const name = text(place["name"]);
     if (!id || !/^[a-z][a-z_]{0,24}:[1-9]\d{0,14}$/.test(id) || !name) continue;
+    if (lookup.kind && place["kind"] !== lookup.kind) continue;
     const matchesLookup = lookup.iata
       ? place["kind"] === "airport" && place["iata"] === lookup.iata
       : lookup.names.some((candidate) => normalized(candidate) === normalized(name));
