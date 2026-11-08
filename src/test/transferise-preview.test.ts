@@ -217,14 +217,54 @@ describe("Transferise sandbox transport", () => {
     for (const [status, code] of [[302, "redirect_blocked"], [401, "unauthorized"], [403, "forbidden"], [429, "rate_limited"]] as const) {
       const f = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status }));
       expect(await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW }))
-        .toEqual({ kind: "error", code });
+        .toMatchObject({ kind: "error", code, request: { stage: "pickup_places", httpStatus: status } });
       expect(f).toHaveBeenCalledTimes(1);
     }
     const f = vi.fn<typeof fetch>().mockRejectedValue(Object.assign(new Error(KEY), {
       cause: { code: "ENOTFOUND" },
     }));
     expect(await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW }))
-      .toEqual({ kind: "error", code: "dns_error" });
+      .toMatchObject({ kind: "error", code: "dns_error", request: { stage: "pickup_places", httpStatus: null } });
+  });
+
+  it("reports the failed quote status, IDs and safe provider code without exposing the error body", async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(airport))
+      .mockResolvedValueOnce(Response.json({ ok: true, results: [] }))
+      .mockResolvedValueOnce(Response.json({ ok: false, error: "route_not_found", message: KEY, debug: { secret: KEY } }, { status: 422 }));
+    const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
+    expect(result).toMatchObject({ kind: "error", code: "http_error", request: {
+      stage: "quote", httpStatus: 422, providerCode: "route_not_found",
+      fromId: "airport:456", toId: "hotel:17370", usedDocumentedId: true,
+    }, location: { stage: "destination", reason: "empty_results" } });
+    expect(f).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(result)).not.toContain(KEY);
+    expect(result).not.toHaveProperty("offers");
+  });
+
+  it("identifies destination search failures and keeps the HTTP status for non-JSON errors", async () => {
+    const f = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(airport))
+      .mockResolvedValueOnce(new Response(`<html>${KEY}</html>`, { status: 502 }));
+    const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
+    expect(result).toMatchObject({ kind: "error", code: "http_error", request: {
+      stage: "destination_places", httpStatus: 502, providerCode: null,
+    } });
+    expect(JSON.stringify(result)).not.toContain(KEY);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects key-like or free-text error fields and distinguishes HTTP-200 API rejection", async () => {
+    for (const error of [KEY, "Something failed: " + KEY]) {
+      const f = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: false, error }, { status: 500 }));
+      const result = await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW });
+      expect(result).toMatchObject({ kind: "error", code: "http_error", request: { httpStatus: 500, providerCode: null } });
+      expect(JSON.stringify(result)).not.toContain(KEY);
+    }
+    const f = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: false, error: { code: "q_too_short", message: KEY } }));
+    expect(await searchTransferiseSandbox(INPUT, { key: KEY, fetchImpl: f, now: NOW }))
+      .toMatchObject({ kind: "error", code: "api_rejected", request: { httpStatus: 200, providerCode: "q_too_short" } });
   });
 });
+
 
