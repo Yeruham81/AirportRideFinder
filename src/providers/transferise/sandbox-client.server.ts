@@ -10,9 +10,18 @@ export type TransferiseFailure = GetTransferTransportFailure | "timeout" | "redi
   "unauthorized" | "forbidden" | "rate_limited" | "http_error" | "api_rejected" |
   "malformed_response" | "invalid_sandbox_key" | "invalid" | "location_unresolved";
 
+export interface TransferiseRequestDiagnostic {
+  stage: "pickup_places" | "destination_places" | "quote";
+  httpStatus: number | null;
+  providerCode: string | null;
+  fromId: string | null;
+  toId: string | null;
+  usedDocumentedId: boolean;
+}
+
 export type TransferiseSandboxResult =
   | { kind: "ok"; offers: TransferisePreviewOffer[]; bookingUrl: string | null; routeLabel: string; retrievedAt: string }
-  | { kind: "error"; code: TransferiseFailure; location?: TransferiseLocationDiagnostic };
+  | { kind: "error"; code: TransferiseFailure; location?: TransferiseLocationDiagnostic; request?: TransferiseRequestDiagnostic };
 
 class SafeFailure extends Error {
   constructor(readonly code: TransferiseFailure, readonly location?: TransferiseLocationDiagnostic) { super(code); }
@@ -28,20 +37,11 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(options.timeoutMs ?? 15_000, 20_000));
   const fetchImpl = options.fetchImpl ?? fetch;
+  let requestDiagnostic: TransferiseRequestDiagnostic | undefined;
+  let locationDiagnostic: TransferiseLocationDiagnostic | undefined;
+  let usedDocumentedId = false;
 
-  async function request(params: Record<string, string>): Promise<unknown> {
-    const url = new URL(TRANSFERISE_ENDPOINT);
-    url.search = new URLSearchParams(params).toString();
-    const response = await fetchImpl(url.toString(), {
-      method: "GET", headers: { "X-Api-Key": key!, Accept: "application/json" },
-      redirect: "manual", cache: "no-store", signal: controller.signal,
-    });
-    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400))
-      throw new SafeFailure("redirect_blocked");
-    if (response.status === 401) throw new SafeFailure("unauthorized");
-    if (response.status === 403) throw new SafeFailure("forbidden");
-    if (response.status === 429) throw new SafeFailure("rate_limited");
-    if (!response.ok) throw new SafeFailure("http_error");
+  async function boundedJson(response: Response): Promise<unknown> {
     // Bounded response, including runtimes where Content-Length is not present.
     if (Number(response.headers.get("Content-Length")) > 512_000 || !response.body)
       throw new SafeFailure("malformed_response");
@@ -63,15 +63,56 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
     let data: unknown;
     try { data = JSON.parse(new TextDecoder().decode(bytes)); }
     catch { throw new SafeFailure("malformed_response"); }
-    if (data && typeof data === "object" && "ok" in data && data.ok === false)
+    return data;
+  }
+
+  function providerErrorCode(data: unknown): string | null {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const record = data as Record<string, unknown>;
+    const error = record["error"];
+    const nested = error && typeof error === "object" ? error as Record<string, unknown> : null;
+    const code = nested?.["code"] ?? error ?? record["code"];
+    // Accept only a short machine code. No free-text message, key or raw body.
+    return typeof code === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(code) &&
+      !code.startsWith("tfx_") && !code.includes(key!) ? code : null;
+  }
+
+  async function request(params: Record<string, string>, stage: TransferiseRequestDiagnostic["stage"]): Promise<unknown> {
+    requestDiagnostic = {
+      stage, httpStatus: null, providerCode: null,
+      fromId: stage === "quote" ? params["from"] ?? null : null,
+      toId: stage === "quote" ? params["to"] ?? null : null,
+      usedDocumentedId: stage === "quote" && usedDocumentedId,
+    };
+    const url = new URL(TRANSFERISE_ENDPOINT);
+    url.search = new URLSearchParams(params).toString();
+    const response = await fetchImpl(url.toString(), {
+      method: "GET", headers: { "X-Api-Key": key!, Accept: "application/json" },
+      redirect: "manual", cache: "no-store", signal: controller.signal,
+    });
+    requestDiagnostic.httpStatus = response.status;
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400))
+      throw new SafeFailure("redirect_blocked");
+    if (!response.ok) {
+      // Malformed/HTML error bodies must never hide the actual HTTP status.
+      try { requestDiagnostic.providerCode = providerErrorCode(await boundedJson(response)); } catch { /* status is enough */ }
+      if (response.status === 401) throw new SafeFailure("unauthorized");
+      if (response.status === 403) throw new SafeFailure("forbidden");
+      if (response.status === 429) throw new SafeFailure("rate_limited");
+      throw new SafeFailure("http_error");
+    }
+    const data = await boundedJson(response);
+    if (data && typeof data === "object" && "ok" in data && data.ok === false) {
+      requestDiagnostic.providerCode = providerErrorCode(data);
       throw new SafeFailure("api_rejected");
+    }
     return data;
   }
 
   try {
     // Prefer real places results. Rixos also has an explicit hotel ID in the
     // provider console example, but a fallback quote must verify its identity.
-    const fromData = await request({ action: "places", q: route.from.query });
+    const fromData = await request({ action: "places", q: route.from.query }, "pickup_places");
     const fromCheck = inspectTransferisePlace(fromData, route.from, key);
     const from = fromCheck.place;
     const diagnostic = (check: typeof fromCheck, stage: "pickup" | "destination", query: string): TransferiseLocationDiagnostic => ({
@@ -79,16 +120,18 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
       matchingCount: check.matchingCount, candidates: check.candidates,
     });
     if (!from) throw new SafeFailure("location_unresolved", diagnostic(fromCheck, "pickup", route.from.query));
-    const toData = await request({ action: "places", q: route.to.query });
+    const toData = await request({ action: "places", q: route.to.query }, "destination_places");
     const toCheck = inspectTransferisePlace(toData, route.to, key);
     const destinationDiagnostic = diagnostic(toCheck, "destination", route.to.query);
     const fallbackId = toCheck.reason !== "invalid_response" ? route.to.documentedQuoteId : undefined;
     const toId = toCheck.place?.id ?? fallbackId;
     if (!toId) throw new SafeFailure("location_unresolved", destinationDiagnostic);
+    usedDocumentedId = !toCheck.place && !!fallbackId;
+    if (usedDocumentedId) locationDiagnostic = destinationDiagnostic;
     const body = await request({
       action: "quote", from: from.id, to: toId, date: input.date, time: input.time,
       passengers: String(input.passengers), currency: input.currency, lang: "en",
-    });
+    }, "quote");
     const toLabel = toCheck.place?.label ?? verifiedTransferiseQuoteDestination(body, route.to);
     if (!toLabel) throw new SafeFailure("location_unresolved", {
       ...destinationDiagnostic, reason: "quote_destination_unverified",
@@ -99,10 +142,13 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
     if (parsed.bookingUrl?.includes(key)) throw new SafeFailure("malformed_response");
     return { ...parsed, routeLabel: `${from.label} → ${toLabel}`, retrievedAt: new Date().toISOString() };
   } catch (error) {
+    const requestInfo = requestDiagnostic ? { request: requestDiagnostic } : {};
     if (error instanceof SafeFailure) return {
-      kind: "error", code: error.code, ...(error.location ? { location: error.location } : {}),
+      kind: "error", code: error.code, ...requestInfo,
+      ...(error.location || locationDiagnostic ? { location: error.location ?? locationDiagnostic! } : {}),
     };
-    return { kind: "error", code: controller.signal.aborted ? "timeout" : classifyGetTransferTransportFailure(error) };
+    return { kind: "error", code: controller.signal.aborted ? "timeout" : classifyGetTransferTransportFailure(error), ...requestInfo };
   } finally { clearTimeout(timer); }
 }
+
 
