@@ -40,6 +40,17 @@ describe("Transferise actual location suggestions", () => {
     expect(JSON.stringify(result)).not.toContain(KEY);
   });
 
+  it("accepts a broad-prefix result list while bounding the number of processed records", () => {
+    const result = parseTransferisePlaces({ ok: true, results: Array.from({ length: 240 }, (_, index) => ({
+      id: `hotel:${index + 1}`, kind: "hotel", name: `River Hotel ${index + 1}`,
+    })) }, "RI");
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") throw new Error();
+    expect(result.places).toHaveLength(200);
+    expect(result.places[0]?.id).toBe("hotel:1");
+    expect(result.places[199]?.id).toBe("hotel:200");
+  });
+
   it("requires two characters and uses only the places GET with the server-side sandbox header", async () => {
     const f = vi.fn<typeof fetch>().mockResolvedValue(Response.json(AIRPORT));
     expect(cleanTransferisePlaceQuery("A")).toBeNull();
@@ -106,3 +117,4 @@ describe("Private autocomplete request budget", () => {
     resetPreviewLimitForTests();
   });
 });
+
