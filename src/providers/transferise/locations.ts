@@ -56,7 +56,7 @@ export interface TransferiseSelectablePlace {
 }
 export type TransferisePlaceSuggestions =
   | { kind: "ok"; places: TransferiseSelectablePlace[] }
-  | { kind: "error"; code: string };
+  | { kind: "error"; code: string; httpStatus?: number | null; providerCode?: string | null };
 
 function pickupZone(iata: string | null, country: string | null) {
   if (iata && AIRPORT_ZONES[iata]) return AIRPORT_ZONES[iata]!;
@@ -71,10 +71,12 @@ function pickupZone(iata: string | null, country: string | null) {
 export function parseTransferisePlaces(body: unknown, query: string, hiddenValue?: string): TransferisePlaceSuggestions {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { kind: "error", code: "malformed_response" };
   const data = body as Record<string, unknown>;
-  if (data["ok"] !== true || !Array.isArray(data["results"]) || data["results"].length > 200)
+  if (data["ok"] !== true || !Array.isArray(data["results"]))
     return { kind: "error", code: "malformed_response" };
   const places = new Map<string, TransferiseSelectablePlace>();
-  for (const raw of data["results"]) {
+  // Broad prefixes may legitimately yield many records; bound processing, not
+  // the validity of the entire reply. The transport already bounds body bytes.
+  for (const raw of data["results"].slice(0, 200)) {
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Record<string, unknown>;
     const id = clean(item["id"], 100, hiddenValue);
@@ -106,3 +108,4 @@ export function validTransferiseSelectedSearch(input: TransferiseSelectedSearchI
     !isPastPickup(input.date, input.time, input.pickupTimeZone, now) &&
     new Date(`${input.date}T00:00:00Z`).getTime() - now.getTime() <= 366 * 86400_000;
 }
+

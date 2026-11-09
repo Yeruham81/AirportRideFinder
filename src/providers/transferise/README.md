@@ -29,6 +29,10 @@ and shared with the other previews. No key is returned to the browser.
    and Enter or a mouse click select an item. Editing the text immediately clears
    its selected ID and any previous quote. Late responses cannot replace current
    suggestions. Typing has its own per-minute limit, separate from quote searches.
+   An empty short-prefix reply is merged with matching unexpired provider records
+   already fetched (for example, shortening `RIX` to `RI` preserves known Rixos
+   records). Initial two-character empty replies ask the user to keep typing;
+   the UI does not claim the provider universally requires three characters.
 3. Check the pickup time zone (inferred for known airports/countries, otherwise
    select it explicitly), pickup date/time, passengers and currency. Submit a
    quote. The server re-queries each selected place's original search and requires
@@ -62,6 +66,7 @@ References reviewed on 2026-11-08:
 
 Automated tests mock every response; a real quote requires the user's server-side
 sandbox key and a deployment environment with outbound HTTPS access.
+
 
 
 

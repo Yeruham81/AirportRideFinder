@@ -55,18 +55,20 @@ export function TransferiseLocationAutocomplete({ label, selected, onSelected, s
     return () => { clearTimeout(timer); generation.current++; };
   }, [query, cacheKey, term, open, disabled, selected?.id, selected?.label, search]);
 
-  let matches: TransferiseSelectablePlace[] = [];
-  if (response?.query === cacheKey && response.result.kind === "ok") matches = response.result.places;
-  else if (query.length > 0) {
-    // Already verified records can respond to the first character locally.
-    const local = new Map<string, TransferiseSelectablePlace>();
-    for (const entry of cache.current.values()) if (entry.until > Date.now()) {
-      for (const place of entry.places) if (normalize(place.label + " " + place.name).includes(cacheKey)) local.set(place.id, place);
-    }
-    matches = [...local.values()];
+  const suggestions = new Map<string, TransferiseSelectablePlace>();
+  if (response?.query === cacheKey && response.result.kind === "ok") {
+    for (const place of response.result.places) suggestions.set(place.id, place);
   }
-  matches = matches.slice(0, 30);
-  const error = response?.query === cacheKey && response.result.kind === "error" ? response.result.code : null;
+  if (query.length > 0) {
+    // A short-query empty reply must not hide known matching database records
+    // returned by an earlier, longer query. Fresh results take precedence.
+    for (const entry of cache.current.values()) if (entry.until > Date.now()) {
+      for (const place of entry.places) if (!suggestions.has(place.id) && normalize(place.label + " " + place.name).includes(cacheKey)) suggestions.set(place.id, place);
+    }
+  }
+  const matches = [...suggestions.values()].slice(0, 30);
+  const error = response?.query === cacheKey && response.result.kind === "error" ? response.result : null;
+  const awaitingResponse = query.length >= TRANSFERISE_AUTOCOMPLETE_MIN && response?.query !== cacheKey && !selected;
   const show = open && query.length > 0 && !disabled;
 
   function edit(value: string) {
@@ -111,12 +113,15 @@ export function TransferiseLocationAutocomplete({ label, selected, onSelected, s
           </li>)}
         </ul>
         <p role="status" className="px-2 py-1 text-xs text-muted-foreground">
-          {error ? (error === "authentication_required" ? "Preview session expired. Sign in again." : error === "rate_limited" ? "Location search limit reached. Pause before trying again." : "Provider location search is temporarily unavailable.") :
-            loading ? "Searching Transferise locations…" :
+          {error ? (error.code === "authentication_required" ? "Preview session expired. Sign in again." : error.code === "rate_limited" ? "Location search limit reached. Pause before trying again." : error.providerCode === "q_too_short" ? "Keep typing. Transferise needs a longer search." : "Provider location search is temporarily unavailable.") :
+            loading || awaitingResponse ? "Searching Transferise locations…" :
             matches.length ? "Select a matching location." :
-            query.length < TRANSFERISE_AUTOCOMPLETE_MIN ? "Type at least 2 characters to search Transferise." : "No matching locations returned by Transferise."}
+            query.length < TRANSFERISE_AUTOCOMPLETE_MIN ? "Type at least 2 characters to search Transferise." :
+            query.length === TRANSFERISE_AUTOCOMPLETE_MIN ? "No suggestions yet. Keep typing the location name." : "No matching locations returned by Transferise."}
+          {error && <span className="block">Diagnostic: <code>{error.code}</code>{error.httpStatus != null ? ` · HTTP ${error.httpStatus}` : ""}{error.providerCode ? ` · ${error.providerCode}` : ""}</span>}
         </p>
       </div>}
     </div>
   );
 }
+

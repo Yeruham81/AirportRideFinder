@@ -77,4 +77,42 @@ describe("Transferise autocomplete selection", () => {
     expect(screen.getByText("No matching locations returned by Transferise.")).toBeInTheDocument();
     expect(screen.getByTestId("selection")).toHaveTextContent("none");
   });
+
+  it("asks for more text for an empty RI search and preserves verified Rixos records when shortening RIX", async () => {
+    const rixos: TransferiseSelectablePlace = {
+      ...airport, id: "hotel:811", name: "Rixos Downtown Antalya Hotel", label: "Rixos Downtown Antalya Hotel",
+      kind: "hotel", iata: null, searchQuery: "RIX",
+    };
+    const search = vi.fn<(query: string) => Promise<TransferisePlaceSuggestions>>()
+      .mockResolvedValueOnce({ kind: "ok", places: [] })
+      .mockResolvedValueOnce({ kind: "ok", places: [rixos] });
+    render(<Harness search={search} />);
+    const input = screen.getByRole("combobox"); fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "RI" } });
+    expect(screen.queryByText("No matching locations returned by Transferise.")).not.toBeInTheDocument();
+    await tick();
+    expect(screen.getByText("No suggestions yet. Keep typing the location name.")).toBeInTheDocument();
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "RIX" } }); await tick();
+    expect(screen.getByRole("option", { name: /Rixos Downtown/ })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "RI" } }); await tick();
+    expect(screen.getByRole("option", { name: /Rixos Downtown/ })).toBeInTheDocument();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("selection")).toHaveTextContent("none");
+    fireEvent.click(screen.getByRole("option", { name: /Rixos Downtown/ }));
+    expect(screen.getByTestId("selection")).toHaveTextContent("hotel:811");
+  });
+
+  it("shows the safe provider error when a short-prefix query is explicitly rejected", async () => {
+    const search = vi.fn<(query: string) => Promise<TransferisePlaceSuggestions>>()
+      .mockResolvedValue({ kind: "error", code: "api_rejected", httpStatus: 400, providerCode: "q_too_short" });
+    render(<Harness search={search} />);
+    const input = screen.getByRole("combobox"); fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "RI" } }); await tick();
+    const status = screen.getByText(/Keep typing. Transferise needs a longer search/);
+    expect(status).toHaveTextContent("HTTP 400");
+    expect(status).toHaveTextContent("q_too_short");
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
 });
+
