@@ -2,7 +2,8 @@
 
 `/transferise-preview` is separate from the public comparison, disabled by default,
 and uses the existing private preview password/session signing secret. All API
-requests originate on the server after authentication and a manual search.
+requests originate on the server after authentication. Location suggestions are
+debounced while typing; quotes are requested only on explicit submission.
 
 Set these **on the hosting server**, never as `VITE_*` or in source control:
 
@@ -19,24 +20,28 @@ and shared with the other previews. No key is returned to the browser.
 
 ## Manual verification
 
-1. Open `/transferise-preview`, unlock it, select Antalya Airport → Rixos Downtown
-   Antalya Hotel with a pickup at least one week ahead, two passengers and EUR.
-2. Submit once. The server resolves real location IDs with `action=places`,
-   then calls `action=quote`. Check vehicle names, price/currency and capacity.
-   Additional available test routes are Antalya → Kemer and Istanbul → Taksim;
-   a route may be unavailable if the API cannot resolve an unambiguous match.
-   Rixos is matched using the observed API name `Rixos Downtown Antalya Hotel`
-   (or a verified older alias). The quote uses the airport/hotel IDs actually
-   returned by `places`, never fixed IDs from documentation examples. A failed
-   or ambiguous lookup stops before the quote. The private diagnostic reports
-   lookup counts, up to six sanitized place records, and request stage/status
-   when available, never keys, headers or raw responses.
-3. If the response explicitly has `test: true` and returns a valid HTTPS
+1. Open `/transferise-preview`, unlock it, type `Antalya` into Pickup and choose
+   the airport from the actual provider suggestions. Type `Rixos` in Destination
+   and choose the intended hotel. The old three-preset dropdown is no longer used.
+2. Suggestions are fetched automatically after 2 characters and 350 ms without
+   typing. Only real API records are shown; a small 5-minute local cache may also
+   suggest previously returned places from the first character. Keyboard arrows
+   and Enter or a mouse click select an item. Editing the text immediately clears
+   its selected ID and any previous quote. Late responses cannot replace current
+   suggestions. Typing has its own per-minute limit, separate from quote searches.
+3. Check the pickup time zone (inferred for known airports/countries, otherwise
+   select it explicitly), pickup date/time, passengers and currency. Submit a
+   quote. The server re-queries each selected place's original search and requires
+   its exact ID to still be returned before calling `quote`. Browser text/labels
+   and manually supplied IDs cannot bypass provider-database verification.
+   Test other covered pairs and the reverse direction where supported. A place
+   being found does not guarantee the provider prices every pair of places.
+4. If the response explicitly has `test: true` and returns a valid HTTPS
    `transferise.com` URL, manually open **Open sandbox booking page**. The URL and
    referral parameters are preserved. It is a route link, not a promise that a
    particular vehicle is preselected. Check the developer console for attribution
    and the sandbox checklist; this preview cannot verify that console remotely.
-4. If `test` is absent or false, no checkout link is shown, even if prices are
+5. If `test` is absent or false, no checkout link is shown, even if prices are
    returned. Ask Transferise to confirm the sandbox response contract before
    opening any unverified checkout. No live checkout is inferred from URL shape.
 
@@ -57,5 +62,6 @@ References reviewed on 2026-11-08:
 
 Automated tests mock every response; a real quote requires the user's server-side
 sandbox key and a deployment environment with outbound HTTPS access.
+
 
 

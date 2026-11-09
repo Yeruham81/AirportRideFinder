@@ -5,13 +5,17 @@ import {
   prepareTransferiseSearch, inspectTransferisePlace,
   type TransferisePreviewInput, type TransferisePreviewOffer, type TransferiseLocationDiagnostic,
 } from "./preview";
+import {
+  cleanTransferisePlaceQuery, parseTransferisePlaces, validTransferiseSelectedSearch,
+  type TransferiseSelectedSearchInput,
+} from "./locations";
 
 export type TransferiseFailure = GetTransferTransportFailure | "timeout" | "redirect_blocked" |
   "unauthorized" | "forbidden" | "rate_limited" | "http_error" | "api_rejected" |
-  "malformed_response" | "invalid_sandbox_key" | "invalid" | "location_unresolved";
+  "malformed_response" | "invalid_sandbox_key" | "invalid" | "location_unresolved" | "selection_unavailable";
 
 export interface TransferiseRequestDiagnostic {
-  stage: "pickup_places" | "destination_places" | "quote";
+  stage: "pickup_places" | "destination_places" | "quote" | "autocomplete_places";
   httpStatus: number | null;
   providerCode: string | null;
   fromId: string | null;
@@ -26,13 +30,17 @@ class SafeFailure extends Error {
   constructor(readonly code: TransferiseFailure, readonly location?: TransferiseLocationDiagnostic) { super(code); }
 }
 
-export async function searchTransferiseSandbox(input: TransferisePreviewInput, options: {
+interface SandboxOptions {
   key: string | undefined; fetchImpl?: typeof fetch; timeoutMs?: number; now?: Date;
-}): Promise<TransferiseSandboxResult> {
+}
+type Failure = Extract<TransferiseSandboxResult, { kind: "error" }>;
+type Request = (params: Record<string, string>, stage: TransferiseRequestDiagnostic["stage"]) => Promise<unknown>;
+
+async function sandboxRequestSession<T extends { kind: "ok" }>(
+  options: SandboxOptions, perform: (request: Request, key: string) => Promise<T>,
+): Promise<T | Failure> {
   const key = options.key?.trim();
   if (!isTransferiseSandboxKey(key)) return { kind: "error", code: "invalid_sandbox_key" };
-  const route = prepareTransferiseSearch(input, options.now);
-  if (!route) return { kind: "error", code: "invalid" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(options.timeoutMs ?? 15_000, 20_000));
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -106,6 +114,25 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
   }
 
   try {
+    return await perform(request, key);
+  } catch (error) {
+    const requestInfo = requestDiagnostic ? { request: requestDiagnostic } : {};
+    if (error instanceof SafeFailure) return {
+      kind: "error", code: error.code, ...requestInfo,
+      ...(error.location ? { location: error.location } : {}),
+    };
+    return { kind: "error", code: controller.signal.aborted ? "timeout" : classifyGetTransferTransportFailure(error), ...requestInfo };
+  } finally { clearTimeout(timer); }
+}
+
+
+
+
+/** Retained for bounded preset diagnostics/tests; the UI now uses explicit selections. */
+export async function searchTransferiseSandbox(input: TransferisePreviewInput, options: SandboxOptions): Promise<TransferiseSandboxResult> {
+  const route = prepareTransferiseSearch(input, options.now);
+  if (!route) return { kind: "error", code: "invalid" };
+  return sandboxRequestSession(options, async (request, key) => {
     // Use only IDs returned by the actual places responses for this account.
     // Documentation/example IDs must never replace a failed place lookup.
     const fromData = await request({ action: "places", q: route.from.query }, "pickup_places");
@@ -130,15 +157,44 @@ export async function searchTransferiseSandbox(input: TransferisePreviewInput, o
     // Defend against an upstream response reflecting the key in its URL.
     if (parsed.bookingUrl?.includes(key)) throw new SafeFailure("malformed_response");
     return { ...parsed, routeLabel: `${from.label} → ${to.label}`, retrievedAt: new Date().toISOString() };
-  } catch (error) {
-    const requestInfo = requestDiagnostic ? { request: requestDiagnostic } : {};
-    if (error instanceof SafeFailure) return {
-      kind: "error", code: error.code, ...requestInfo,
-      ...(error.location ? { location: error.location } : {}),
-    };
-    return { kind: "error", code: controller.signal.aborted ? "timeout" : classifyGetTransferTransportFailure(error), ...requestInfo };
-  } finally { clearTimeout(timer); }
+  });
 }
 
+/** Suggestions contain only validated records actually returned by places. */
+export async function searchTransferisePlacesSandbox(query: string, options: SandboxOptions) {
+  const q = cleanTransferisePlaceQuery(query);
+  if (!q) return { kind: "error" as const, code: "invalid" as const };
+  return sandboxRequestSession(options, async (request, key) => {
+    const data = await request({ action: "places", q }, "autocomplete_places");
+    const parsed = parseTransferisePlaces(data, q, key);
+    if (parsed.kind !== "ok") throw new SafeFailure("malformed_response");
+    return parsed;
+  });
+}
 
+/** Revalidate selected IDs against fresh provider records before every quote. */
+export async function searchTransferiseSelectedSandbox(input: TransferiseSelectedSearchInput, options: SandboxOptions): Promise<TransferiseSandboxResult> {
+  if (!validTransferiseSelectedSearch(input, options.now)) return { kind: "error", code: "invalid" };
+  return sandboxRequestSession(options, async (request, key) => {
+    async function selectedPlace(ref: { id: string; query: string }, stage: "pickup_places" | "destination_places") {
+      const data = await request({ action: "places", q: ref.query.trim() }, stage);
+      const parsed = parseTransferisePlaces(data, ref.query.trim(), key);
+      if (parsed.kind !== "ok") throw new SafeFailure("malformed_response");
+      const place = parsed.places.find((item) => item.id === ref.id);
+      if (!place) throw new SafeFailure("selection_unavailable");
+      return place;
+    }
+    const from = await selectedPlace(input.from, "pickup_places");
+    const to = await selectedPlace(input.to, "destination_places");
+    if (from.timeZone && from.timeZone !== input.pickupTimeZone) throw new SafeFailure("invalid");
+    const body = await request({
+      action: "quote", from: from.id, to: to.id, date: input.date, time: input.time,
+      passengers: String(input.passengers), currency: input.currency, lang: "en",
+    }, "quote");
+    const parsed = parseTransferiseQuote(body, input);
+    if (parsed.kind !== "ok") throw new SafeFailure(parsed.kind);
+    if (parsed.bookingUrl?.includes(key)) throw new SafeFailure("malformed_response");
+    return { ...parsed, routeLabel: `${from.label} → ${to.label}`, retrievedAt: new Date().toISOString() };
+  });
+}
 

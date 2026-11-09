@@ -1,14 +1,18 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { KeyRound, Lock } from "lucide-react";
 import { defaultPickupDate } from "@/domain/time";
 import {
-  TRANSFERISE_CURRENCIES, TRANSFERISE_PREVIEW_ROUTES, TRANSFERISE_TIME_ZONE,
+  TRANSFERISE_CURRENCIES, TRANSFERISE_TIME_ZONE,
   type TransferiseCurrency,
 } from "@/providers/transferise/preview";
 import { TransferisePreviewResults } from "@/components/transferise/TransferisePreviewResults";
+import { TransferiseLocationAutocomplete } from "@/components/transferise/TransferiseLocationAutocomplete";
 import {
-  getTransferisePreviewStatus, lockTransferisePreview,
+  TRANSFERISE_PICKUP_ZONES, transferisePickupZoneOptions, type TransferisePlaceSuggestions, type TransferiseSelectablePlace,
+} from "@/providers/transferise/locations";
+import {
+  getTransferisePreviewStatus, getTransferisePlaces, lockTransferisePreview,
   searchTransferisePreview, unlockTransferisePreview,
 } from "@/search/transferise-preview.functions";
 
@@ -27,6 +31,7 @@ const ERRORS: Record<string, string> = {
   unauthorized: "Transferise rejected the sandbox key (401).",
   forbidden: "Transferise denied this request (403). Check the key's domain settings.",
   rate_limited: "Transferise's request limit has been reached (429).",
+  selection_unavailable: "A selected place is no longer returned by Transferise. Choose it again from the suggestions.",
   location_unresolved: "The requested place could not be verified. See the location diagnostic below.",
   malformed_response: "The API response could not be verified for this search.",
   api_rejected: "Transferise rejected this search. Try a later pickup or a different route.",
@@ -39,6 +44,10 @@ const ERRORS: Record<string, string> = {
   http_error: "Transferise returned an unexpected HTTP response.",
 };
 
+async function searchLocations(query: string): Promise<TransferisePlaceSuggestions> {
+  return getTransferisePlaces({ data: { query } });
+}
+
 function TransferisePreview() {
   const state = Route.useLoaderData();
   const router = useRouter();
@@ -46,7 +55,13 @@ function TransferisePreview() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState(false);
-  const [routeId, setRouteId] = useState("antalya-rixos");
+  const [from, setFrom] = useState<TransferiseSelectablePlace | null>(null);
+  const [to, setTo] = useState<TransferiseSelectablePlace | null>(null);
+  const [pickupTimeZone, setPickupTimeZone] = useState("");
+  const [pickupZones, setPickupZones] = useState<{ value: string; label: string }[]>(
+    () => TRANSFERISE_PICKUP_ZONES.map(([value, label]) => ({ value, label })),
+  );
+  useEffect(() => { setPickupZones(transferisePickupZoneOptions()); }, []);
   const [date, setDate] = useState(() => defaultPickupDate(TRANSFERISE_TIME_ZONE));
   const [time, setTime] = useState("14:00");
   const [passengers, setPassengers] = useState(2);
@@ -77,8 +92,15 @@ function TransferisePreview() {
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-    setPending(true); setQuote(null);
-    try { setQuote(await searchTransferisePreview({ data: { routeId, date, time, passengers, currency } })); }
+    if (!from || !to || from.id === to.id || !pickupTimeZone) {
+      setFeedback("Choose two different locations from the suggestions and confirm the pickup time zone.");
+      return;
+    }
+    setPending(true); setQuote(null); setFeedback(null);
+    try { setQuote(await searchTransferisePreview({ data: {
+      from: { id: from.id, query: from.searchQuery }, to: { id: to.id, query: to.searchQuery },
+      date, time, passengers, currency, pickupTimeZone,
+    } })); }
     catch { setQuote({ kind: "request_failed" }); }
     finally { setPending(false); }
   }
@@ -86,10 +108,10 @@ function TransferisePreview() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · API check v5</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · Autocomplete v1</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Transferise — API price preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sandbox quotes for one-way transfers in Türkiye. Prices come directly from the API.
+          Choose pickup and destination from Transferise's location suggestions. Prices come directly from the sandbox API.
           This preview creates no reservations and accepts no payments.
         </p>
       </header>
@@ -124,17 +146,25 @@ function TransferisePreview() {
           <form onSubmit={(event) => void search(event)} className="rounded-xl border bg-card p-5 shadow-card">
             <fieldset disabled={pending || busy} className="space-y-4 disabled:opacity-70">
               <legend className="font-display text-lg font-bold">One-way transfer — sandbox search</legend>
-              <label className="block text-sm font-semibold">Test route
-                <select className={field} value={routeId} onChange={(event) => { setRouteId(event.target.value); setQuote(null); }}>
-                  {TRANSFERISE_PREVIEW_ROUTES.map((route) => <option key={route.id} value={route.id}>{route.label}</option>)}
-                </select>
-              </label>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TransferiseLocationAutocomplete label="Pickup" selected={from} search={searchLocations} disabled={pending || busy}
+                  onSelected={(place) => { setFrom(place); setPickupTimeZone(place?.timeZone ?? ""); setQuote(null); setFeedback(null); }} />
+                <TransferiseLocationAutocomplete label="Destination" selected={to} search={searchLocations} disabled={pending || busy}
+                  onSelected={(place) => { setTo(place); setQuote(null); setFeedback(null); }} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="block text-sm font-semibold">Pickup date
                   <input className={field} type="date" required value={date} onChange={(event) => { setDate(event.target.value); setQuote(null); }} />
                 </label>
-                <label className="block text-sm font-semibold">Pickup time (Türkiye)
+                <label className="block text-sm font-semibold">Pickup time (local)
                   <input className={field} type="time" required value={time} onChange={(event) => { setTime(event.target.value); setQuote(null); }} />
+                </label>
+                <label className="block text-sm font-semibold">Pickup time zone
+                  <select className={field} required value={pickupTimeZone} disabled={!from || !!from.timeZone}
+                    onChange={(event) => { setPickupTimeZone(event.target.value); setQuote(null); }}>
+                    <option value="">Select the pickup time zone</option>
+                    {pickupZones.map((zone) => <option key={zone.value} value={zone.value}>{zone.label}</option>)}
+                  </select>
                 </label>
                 <label className="block text-sm font-semibold">Passengers
                   <select className={field} value={passengers} onChange={(event) => { setPassengers(Number(event.target.value)); setQuote(null); }}>
@@ -147,7 +177,7 @@ function TransferisePreview() {
                   </select>
                 </label>
               </div>
-              <button type="submit" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground">
+              <button type="submit" disabled={!from || !to || from.id === to.id || !pickupTimeZone || pending || busy} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50">
                 {pending ? "Retrieving sandbox prices…" : "Search Transferise sandbox"}
               </button>
             </fieldset>
@@ -160,14 +190,14 @@ function TransferisePreview() {
                   Any enabled booking link opens a test page, not a live checkout.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {quote.routeLabel} · {quote.date} {quote.time} (Türkiye) · {quote.passengers} passengers · {quote.currency}
+                  {quote.routeLabel} · {quote.date} {quote.time} ({quote.pickupTimeZone}) · {quote.passengers} passengers · {quote.currency}
                   <br />Retrieved: {new Date(quote.retrievedAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC
                 </p>
                 <TransferisePreviewResults offers={quote.offers} bookingUrl={quote.bookingUrl} />
               </section>
             )}
             {quote?.kind === "no_offers" && <p role="status" className="rounded-xl border bg-card p-5 text-sm">No matching per-vehicle prices were returned for this search.</p>}
-            {quote?.kind === "invalid" && <p role="alert">Select a valid future pickup, route, currency and 1–16 passengers.</p>}
+            {quote?.kind === "invalid" && <p role="alert">Choose suggested pickup and destination locations, a valid future local pickup/time zone, currency and 1–16 passengers.</p>}
             {quote?.kind === "rate_limited" && <p role="alert">The preview request limit has been reached. Please try again later.</p>}
             {quote?.kind === "authentication_required" && <p role="alert">Your session expired. Lock the preview and sign in again.</p>}
             {(quote?.kind === "disabled" || quote?.kind === "unconfigured") && <p role="status">The preview is disabled or not configured.</p>}
@@ -210,6 +240,7 @@ function TransferisePreview() {
     </div>
   );
 }
+
 
 
 

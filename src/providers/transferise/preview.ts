@@ -154,7 +154,7 @@ export type TransferiseParsedQuote =
   | { kind: "malformed_response" | "api_rejected" };
 
 /** Same currency and per-vehicle price as the API. No conversion or added margin. */
-export function parseTransferiseQuote(body: unknown, input: TransferisePreviewInput): TransferiseParsedQuote {
+export function parseTransferiseQuote(body: unknown, input: Pick<TransferisePreviewInput, "date" | "time" | "passengers" | "currency">): TransferiseParsedQuote {
   const data = record(body);
   if (!data || typeof data["ok"] !== "boolean") return { kind: "malformed_response" };
   if (data["ok"] !== true) return { kind: "api_rejected" };
@@ -198,5 +198,6 @@ export function parseTransferiseQuote(body: unknown, input: TransferisePreviewIn
     bookingUrl: safeTransferiseSandboxLink(data["booking_url"], data["test"] === true),
   };
 }
+
 
 
