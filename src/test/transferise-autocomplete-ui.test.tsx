@@ -109,9 +109,9 @@ describe("Transferise autocomplete selection", () => {
     render(<Harness search={search} />);
     const input = screen.getByRole("combobox"); fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "RI" } }); await tick();
-    expect(screen.getByRole("status")).toHaveTextContent("Transferise needs a longer search");
-    expect(screen.getByRole("status")).toHaveTextContent("HTTP 400");
-    expect(screen.getByRole("status")).toHaveTextContent("q_too_short");
+    const status = screen.getByText(/Keep typing. Transferise needs a longer search/);
+    expect(status).toHaveTextContent("HTTP 400");
+    expect(status).toHaveTextContent("q_too_short");
     expect(screen.queryByRole("option")).not.toBeInTheDocument();
   });
 });
