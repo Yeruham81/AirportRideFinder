@@ -45,7 +45,14 @@ const ERRORS: Record<string, string> = {
 };
 
 async function searchLocations(query: string): Promise<TransferisePlaceSuggestions> {
-  return getTransferisePlaces({ data: { query } });
+  const result = await getTransferisePlaces({ data: { query } });
+  if (result.kind === "ok") return result;
+  return {
+    kind: "error", code: result.code,
+    ...("request" in result && result.request ? {
+      httpStatus: result.request.httpStatus, providerCode: result.request.providerCode,
+    } : {}),
+  };
 }
 
 function TransferisePreview() {
@@ -108,7 +115,7 @@ function TransferisePreview() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · Autocomplete v1</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration test · Transferise · Autocomplete v1.1</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Transferise — API price preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Choose pickup and destination from Transferise's location suggestions. Prices come directly from the sandbox API.
@@ -240,6 +247,7 @@ function TransferisePreview() {
     </div>
   );
 }
+
 
 
 

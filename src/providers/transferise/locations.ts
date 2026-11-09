@@ -56,7 +56,7 @@ export interface TransferiseSelectablePlace {
 }
 export type TransferisePlaceSuggestions =
   | { kind: "ok"; places: TransferiseSelectablePlace[] }
-  | { kind: "error"; code: string };
+  | { kind: "error"; code: string; httpStatus?: number | null; providerCode?: string | null };
 
 function pickupZone(iata: string | null, country: string | null) {
   if (iata && AIRPORT_ZONES[iata]) return AIRPORT_ZONES[iata]!;
@@ -106,3 +106,4 @@ export function validTransferiseSelectedSearch(input: TransferiseSelectedSearchI
     !isPastPickup(input.date, input.time, input.pickupTimeZone, now) &&
     new Date(`${input.date}T00:00:00Z`).getTime() - now.getTime() <= 366 * 86400_000;
 }
+
