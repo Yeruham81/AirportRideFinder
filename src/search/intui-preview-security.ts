@@ -99,7 +99,7 @@ export async function verifyPreviewSession(
 
 /** Local protection only — always combine with deployment-level WAF rules. */
 export function consumePreviewLimit(
-  bucket: "login" | "search",
+  bucket: "login" | "search" | "autocomplete",
   session: string | undefined,
   now = Date.now(),
 ): boolean {
@@ -119,6 +119,11 @@ export function consumePreviewLimit(
   };
   if (bucket === "login") return check("login-global", LOGIN_WINDOW_MS, LOGIN_MAX);
   if (!session) return false;
+  // Typeahead has its own minute budget; typing must not exhaust quote searches.
+  if (bucket === "autocomplete") {
+    if (!check("autocomplete-global", 60_000, 80)) return false;
+    return check(`autocomplete:${session}`, 60_000, 40);
+  }
   // Session is a signed opaque value, never logged or exposed.
   if (!check("search-global", SEARCH_WINDOW_MS, SEARCH_MAX_PER_PROCESS)) return false;
   return check(`search:${session}`, SEARCH_WINDOW_MS, SEARCH_MAX_PER_SESSION);
@@ -127,3 +132,4 @@ export function consumePreviewLimit(
 export function resetPreviewLimitForTests() {
   counters.clear();
 }
+
