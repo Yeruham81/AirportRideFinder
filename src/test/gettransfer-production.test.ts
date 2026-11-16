@@ -70,7 +70,7 @@ describe("GetTransfer production client (mock-only, no real network)", () => {
     expect(offers[1]).toEqual({
       type: "business", indicativeMin: "US$24", bookNow: null,
     });
-    expect(offers[2].bookNow?.minor).toBe(11000);
+    expect(offers[2]?.bookNow?.minor).toBe(11000);
   });
 
   it("never promotes indicative or mismatched-currency values to bookable prices", () => {
