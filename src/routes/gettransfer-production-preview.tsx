@@ -26,7 +26,7 @@ type SearchResult = Awaited<ReturnType<typeof searchGetTransferProductionPreview
 const ERRORS: Record<string, string> = {
   missing_token: "Production token is missing on the server.",
   unauthorized: "GetTransfer rejected the production token (401).",
-  forbidden: "GetTransfer denied access (403).",
+  forbidden: "The production endpoint returned HTTP 403. This may be a GetTransfer account permission or an edge security restriction.",
   rate_limited: "GetTransfer returned HTTP 429.",
   http_error: "GetTransfer returned an unexpected HTTP response.",
   malformed_response: "GetTransfer returned an unrecognized response.",
@@ -256,7 +256,18 @@ function ProductionPreview() {
           {result?.kind === "error" && (
             <p role="alert" className="rounded-xl border bg-card p-5 text-sm">
               {ERRORS[result.code] ?? "The production request could not be completed."}
-              {" "}Diagnostic: <code>{result.code}</code>. No provider response body or token is exposed.
+              {" "}Diagnostic: <code>{result.code}</code>.
+              {result.diagnostic && (
+                <span className="mt-2 block text-xs">
+                  Response format: <code>{result.diagnostic.responseKind}</code>
+                  {" "}· Cloudflare server header: <code>{result.diagnostic.cloudflare ? "yes" : "no"}</code>
+                  {result.diagnostic.cfRay && (
+                    <> · Cloudflare Ray ID: <code>{result.diagnostic.cfRay}</code></>
+                  )}
+                  . These are diagnostic clues, not proof of the denying layer.
+                </span>
+              )}
+              <span className="mt-1 block text-xs">No provider response body or token is exposed.</span>
             </p>
           )}
           {result?.kind === "request_failed" && (

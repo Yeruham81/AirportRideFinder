@@ -93,7 +93,11 @@ export const searchGetTransferProductionPreview = createServerFn({ method: "POST
       token: process.env["GETTRANSFER_PRODUCTION_TOKEN"],
       timeoutMs: 12_000,
     });
-    if (result.status !== "ok") return { kind: "error" as const, code: result.status };
+    if (result.status !== "ok") return {
+      kind: "error" as const,
+      code: result.status,
+      diagnostic: result.status === "forbidden" ? result.diagnostic : null,
+    };
     if (result.diagnostics.success !== true) return { kind: "no_offers" as const };
     const offers = visibleProductionPrices(result.diagnostics.prices);
     if (offers.length === 0) return { kind: "no_offers" as const };

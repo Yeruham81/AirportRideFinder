@@ -60,6 +60,37 @@ describe("GetTransfer production client (mock-only, no real network)", () => {
     })).toEqual({ status: "unauthorized", httpStatus: 401 });
   });
 
+  it("classifies HTTP 403 without exposing provider errors, response bodies or secrets", async () => {
+    const response = new Response(`<html>${TOKEN}</html>`, {
+      status: 403,
+      headers: {
+        "content-type": "text/html; charset=UTF-8",
+        server: "cloudflare",
+        "cf-ray": "7cafe1234abc-LHR",
+      },
+    });
+    const result = await productionRouteInfo(QUERY, {
+      token: TOKEN,
+      fetchImpl: vi.fn(async () => response),
+    });
+    expect(result).toEqual({
+      status: "forbidden",
+      httpStatus: 403,
+      diagnostic: { responseKind: "html", cloudflare: true, cfRay: "7cafe1234abc-LHR" },
+    });
+    expect(JSON.stringify(result)).not.toContain(TOKEN);
+    const api = await productionRouteInfo(QUERY, {
+      token: TOKEN,
+      fetchImpl: vi.fn(async () => Response.json({ error: TOKEN }, { status: 403 })),
+    });
+    expect(api).toEqual({
+      status: "forbidden",
+      httpStatus: 403,
+      diagnostic: { responseKind: "json", cloudflare: false, cfRay: null },
+    });
+    expect(JSON.stringify(api)).not.toContain(TOKEN);
+  });
+
   it("keeps indicative minimums and Book Now prices separate", () => {
     const diagnostics = parseRouteInfo(sample, "USD")!;
     const offers = visibleProductionPrices(diagnostics.prices);

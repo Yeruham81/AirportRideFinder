@@ -9,11 +9,29 @@ import { classifyGetTransferTransportFailure, type GetTransferTransportFailure }
 export const GETTRANSFER_PRODUCTION_HOST = "gettransfer.com";
 export const GETTRANSFER_PRODUCTION_TOKEN_ENV = "GETTRANSFER_PRODUCTION_TOKEN";
 
+export interface ForbiddenDiagnostic {
+  /** Based ONLY on safe, bounded HTTP headers; no response bodies are read. */
+  responseKind: "json" | "html" | "other";
+  cloudflare: boolean;
+  cfRay: string | null;
+}
+
+function forbiddenDiagnostic(response: Response): ForbiddenDiagnostic {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const ray = response.headers.get("cf-ray");
+  return {
+    responseKind: contentType.includes("json") ? "json" : contentType.includes("html") ? "html" : "other",
+    cloudflare: (response.headers.get("server") ?? "").toLowerCase() === "cloudflare",
+    // A limited request identifier may help GetTransfer support locate a rejection.
+    cfRay: ray && /^[a-zA-Z0-9-]{4,80}$/.test(ray) ? ray : null,
+  };
+}
+
 export type ProductionResult =
   | { status: "ok"; httpStatus: number; diagnostics: RouteInfoDiagnostics }
   | { status: "missing_token" }
   | { status: "unauthorized"; httpStatus: 401 }
-  | { status: "forbidden"; httpStatus: 403 }
+  | { status: "forbidden"; httpStatus: 403; diagnostic: ForbiddenDiagnostic }
   | { status: "rate_limited"; httpStatus: 429; retryAfterSeconds: number | null }
   | { status: "http_error"; httpStatus: number }
   | { status: "malformed_response"; httpStatus: number }
@@ -72,7 +90,7 @@ export async function productionRouteInfo(query: RouteInfoQuery, opts: Productio
   if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400))
     return { status: "redirect_blocked" };
   if (response.status === 401) return { status: "unauthorized", httpStatus: 401 };
-  if (response.status === 403) return { status: "forbidden", httpStatus: 403 };
+  if (response.status === 403) return { status: "forbidden", httpStatus: 403, diagnostic: forbiddenDiagnostic(response) };
   if (response.status === 429)
     return { status: "rate_limited", httpStatus: 429, retryAfterSeconds: retryAfter(response.headers.get("retry-after")) };
   if (!response.ok) return { status: "http_error", httpStatus: response.status };
