@@ -27,3 +27,5 @@
 
 - Transferise autocomplete must use authenticated, server-side `places` requests with a separate typing rate limit. Quote pickup and destination must be selections of provider-returned records, revalidated by ID against fresh results; editing input invalidates selection. Never allow arbitrary typed labels or example IDs to become quote locations. Local pickup time needs a valid pickup time zone, not the browser zone or a fixed Türkiye clock for worldwide searches.
 
+
+- GetTransfer production diagnostics are isolated at /gettransfer-production-preview, disabled by default, authenticated with the shared strong preview secrets, and read-only (GET https://gettransfer.com/api/route_info only). GETTRANSFER_PRODUCTION_TOKEN is a server-only secret, not a VITE_* variable. Minimum prices are indicative marketing values; Book Now prices must remain distinct. No public comparison adapter, transfer creation, payment, booking redirect, or affiliate tracking is implemented. Production previews require hosting-level access controls/shared WAF rate limiting in addition to in-process limits.
