@@ -5,15 +5,18 @@ import { AlpsLocationAutocomplete } from "./AlpsLocationAutocomplete";
 import { defaultPickupDate, todayInTimeZone } from "@/domain/time";
 import {
   ALPS_INITIAL_FROM, ALPS_INITIAL_TO,
-  alpsCatalogAllowsPair, alpsSeasonalBagMode, fetchAlpsRouteCatalog, fetchAlpsPublicQuote,
+  alpsCatalogAllowsPair, fetchAlpsRouteCatalog, fetchAlpsPublicQuote,
   validateAlpsPublicQuery,
   type AlpsRouteCatalogResult,
   type AlpsPublicCurrency,
   type AlpsPublicLocation,
   type AlpsPublicQuoteQuery,
   type AlpsPublicQuoteResult,
+  type AlpsPublicOffer,
   type AlpsQuoteMismatchField,
 } from "@/providers/alps2alps/public-quote";
+
+import { resolveBookingLink } from "@/redirect/redirect";
 
 const inputClass = "mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground";
 const quoteError: Record<string, string> = {
@@ -25,17 +28,38 @@ const quoteError: Record<string, string> = {
   quote_mismatch: "The provider confirmed different trip details. No price is shown until the search matches.",
   no_offers: "No requested-time vehicles fit this search.",
   route_unavailable: "The provider does not currently support this pickup / destination combination.",
+  season_unavailable: "The supplier could not confirm the baggage configuration. Please try again later.",
+  ski_unavailable: "Ski equipment requires confirmation with Alps2Alps for this journey. Update the bags to search for a suitcase-only transfer.",
   http_error: "The provider returned an HTTP error. No quote was accepted.",
 };
 
 const mismatchFields: Record<AlpsQuoteMismatchField, string> = {
   route: "The provider returned a different pickup/destination code.",
   currency: "The provider returned a different currency.",
-  passengers: "The provider returned a different adult count.",
+  passengers: "The provider returned different passenger or child-seat counts.",
   pickup_time: "The provider returned a different pickup time.",
   suitcases: "The provider quoted a different suitcase count.",
-  ski_bags: "The provider did not quote the requested ski/snowboard bag count. The supplier ignores ski bags for summer journeys.",
+  ski_bags: "The provider returned a different total bag count or equipment configuration.",
 };
+
+function AlpsBookingLink({ offer, expired }: { offer: AlpsPublicOffer; expired: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setUrl(null);
+    void resolveBookingLink(offer).then(result => {
+      if (active && result.kind === "url") setUrl(result.url);
+    });
+    return () => { active = false; };
+  }, [offer]);
+  if (expired) return <p className="mt-2 text-sm font-semibold">Refresh prices to book</p>;
+  if (!url) return <p className="mt-2 text-sm text-muted-foreground">Booking link unavailable</p>;
+  return <a href={url} target="_blank" rel="sponsored noopener noreferrer"
+    onClick={event => { if (Date.now() >= offer.expiresAt) event.preventDefault(); }}
+    className="mt-3 inline-flex rounded-lg bg-teal px-4 py-2 text-sm font-bold text-white">
+    Book with Alps2Alps
+  </a>;
+}
 
 export function AlpsPublicQuotePanel() {
   const [catalog, setCatalog] = useState<AlpsRouteCatalogResult | null>(null);
@@ -56,14 +80,24 @@ export function AlpsPublicQuotePanel() {
   const [date, setDate] = useState(() => defaultPickupDate("Europe/Zurich"));
   const [time, setTime] = useState("14:00");
   const [passengers, setPassengers] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+  const [childSeats, setChildSeats] = useState(0);
+  const [boosters, setBoosters] = useState(0);
   const [luggage, setLuggage] = useState(2);
-  const [skiBags, setSkiBags] = useState(2);
+  const [skiBags, setSkiBags] = useState(0);
   const [currency, setCurrency] = useState<AlpsPublicCurrency>("EUR");
-  const bagMode = alpsSeasonalBagMode(date);
+  const [expired, setExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AlpsPublicQuoteResult | null>(null);
   const [completed, setCompleted] = useState<AlpsPublicQuoteQuery | null>(null);
   const sequence = useRef(0);
+  useEffect(() => {
+    setExpired(false);
+    if (result?.status !== "ok") return;
+    const timer = setTimeout(() => setExpired(true), Math.max(0, result.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [result]);
   // Swapping recreates location-picker inputs from their corresponding selected location.
   const [swapId, setSwapId] = useState(0);
 
@@ -96,9 +130,8 @@ export function AlpsPublicQuotePanel() {
     event.preventDefault();
     if (busy || !from || !to) return;
     const query: AlpsPublicQuoteQuery = {
-      from: from.code, to: to.code, date, time, passengers,
-      luggage: bagMode === "winter" ? 0 : luggage,
-      skiBags: bagMode === "summer" ? 0 : skiBags,
+      from: from.code, to: to.code, date, time, passengers, children, infants, childSeats, boosters,
+      luggage, skiBags,
       currency,
     };
     if (!validateAlpsPublicQuery(query)) {
@@ -112,15 +145,7 @@ export function AlpsPublicQuotePanel() {
     try {
       const answer = await fetchAlpsPublicQuote(query);
       if (request === sequence.current) {
-        if (answer.status === "ok") {
-          // Both seasonal categories use supplier-confirmed counts; never
-          // silently claim the ignored baggage type is part of this quote.
-          if (answer.bagAdjustment) setSkiBags(0);
-          if (answer.suitcaseAdjustment) setLuggage(0);
-          setCompleted({ ...query, luggage: answer.luggage, skiBags: answer.skiBags });
-        } else {
-          setCompleted(query);
-        }
+        setCompleted(query);
         setResult(answer);
       }
     } catch {
@@ -133,15 +158,12 @@ export function AlpsPublicQuotePanel() {
       <div className="flex items-center gap-2">
         <Wifi className="size-5 text-teal" aria-hidden />
         <h2 id="alps-public-title" className="font-display text-xl font-extrabold">
-          Alps2Alps — live public API test
+          Alps2Alps — live transfer quotes
         </h2>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
-        Search official Alps2Alps locations and request current public prices.
-        This private diagnostic is not linked to the fictional comparison demo.
-        No bookings, affiliate tracking or checkout links are enabled.
-        The active location directory loads once and filters suggestions as you type.
-        Price requests are made only when you press Search; the provider rate-limits by IP.
+        Compare current transfer prices and continue to Alps2Alps to book your selected vehicle.
+        Enter everyone travelling, including children and infants, and all your bags.
       </p>
 
       <div className="mt-5 grid items-start gap-3 md:grid-cols-[1fr_auto_1fr]">
@@ -204,76 +226,52 @@ export function AlpsPublicQuotePanel() {
               <option value="USD">USD ($)</option>
             </select>
           </label>
-          {bagMode === "summer" && (
-            <label className="block text-sm font-semibold">
-              Suitcases
-              <select value={luggage}
-                onChange={(event) => { invalidate(); setLuggage(Number(event.target.value)); }}
+          {[
+            { label: "Children", value: children, set: setChildren, max: 15 },
+            { label: "Infants", value: infants, set: setInfants, max: 15 },
+            { label: "Child seats", value: childSeats, set: setChildSeats, max: 15 },
+            { label: "Boosters", value: boosters, set: setBoosters, max: 15 },
+            { label: "Suitcases", value: luggage, set: setLuggage, max: 8 },
+            { label: "Ski / snowboard bags", value: skiBags, set: setSkiBags, max: 8 },
+          ].map(field => (
+            <label key={field.label} className="block text-sm font-semibold">
+              {field.label}
+              <select value={field.value} disabled={busy}
+                onChange={event => { invalidate(); field.set(Number(event.target.value)); }}
                 className={inputClass}>
-                {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
+                {Array.from({ length: field.max + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-          )}
-          {bagMode === "winter" && (
-            <label className="block text-sm font-semibold">
-              Ski / snowboard bags
-              <select value={skiBags}
-                onChange={(event) => { invalidate(); setSkiBags(Number(event.target.value)); }}
-                className={inputClass}>
-                {Array.from({ length: 9 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-          )}
+          ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          Pickup time is interpreted literally (not as a flight arrival time).
-          Children, return journeys and seats are not yet supported in this controlled test.
-          {bagMode === "winter"
-            ? "Winter quote (Dec–Apr): ski bags only. Standard suitcases are not included in the API basket."
-            : "Summer quote (May–Nov): suitcases only. Ski equipment is not included in the API basket."}
-          {" "}Travelling with both? Confirm carriage directly with Alps2Alps.
+          Enter your preferred pickup time in local time. Child seats and boosters are free.
+          Include infants separately from children. Up to 16 travellers in total.
         </p>
         <button type="submit" disabled={busy || !from || !to || from.code === to.code ||
             (catalog?.status === "ok" && !alpsCatalogAllowsPair(catalog.catalog, from.code, to.code))}
           className="rounded-lg bg-teal px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-          {busy ? "Retrieving live quote…" : "Search live public prices (no key)"}
+          {busy ? "Retrieving live quote…" : "Search transfer prices"}
         </button>
       </form>
 
       {result?.status === "ok" && completed && (
         <div className="mt-6 space-y-3">
-          {result.bagAdjustment && (
-            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              <strong>Ski bags excluded:</strong>{" "}
-              Alps2Alps quoted 0 of the {result.bagAdjustment.requestedSkiBags} requested.
-              Prices exclude ski bags; confirm transport and any extra fees with the provider.
-            </div>
-          )}
-          {result.suitcaseAdjustment && (
-            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              <strong>Suitcases excluded:</strong>{" "}
-              Alps2Alps quoted 0 of the {result.suitcaseAdjustment.requestedSuitcases} requested.
-              Prices exclude suitcases; confirm transport and any extra fees with the provider.
-            </div>
-          )}
           <div role="status" className="rounded-lg border border-teal/20 bg-teal-soft/40 p-4 text-sm">
-            <strong>Public quote API connection successful.</strong>{" "}
+            <strong>Current Alps2Alps prices.</strong>{" "}
             {result.offers.length} live public {result.offers.length === 1 ? "price" : "prices"} for{" "}
             <strong>{result.route.from} → {result.route.to}</strong>, pickup{" "}
-            {result.pickupTime} (local), {completed.passengers} adults,{" "}
-            {result.luggage} suitcases and {result.skiBags} ski bags.
-            No booking was created.
+            {result.pickupTime} (local), {completed.passengers} adults, {completed.children ?? 0} children and {completed.infants ?? 0} infants;{" "}
+            {completed.luggage} suitcases and {completed.skiBags} ski bags.
+            {result.bagMode === "winter" && ` The supplier counts these as ${result.skiBags} bags in total.`}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Technical deep-link check: quotation link {result.linkEvidence.quoteUrlPresent ? "present" : "not verified"};
-            {" "}{result.linkEvidence.vehicleUrlsPresent} of {result.offers.length} vehicle-specific links structurally verified.
-            Links are intentionally disabled; no commission attribution has been confirmed.
+          <p className="text-sm text-muted-foreground">
+            {result.discountPercent !== null
+              ? `Includes the supplier’s ${result.discountPercent}% partner discount.`
+              : "Supplier rate for the selected trip."}
+            {" "}Prices refresh when you open the booking page. PayPal fees and currency-rate changes may affect the final amount.
           </p>
-          <p className="text-xs text-muted-foreground">
-            Private technical test only. Prices may change before checkout. Permission to compare
-            offers publicly, final checkout price and commission tracking remain unconfirmed.
-            GBP/USD quotes may reflect exchange rates that change before payment.
-          </p>
+          {expired && <p role="status" className="text-sm font-semibold">Refresh your search for current prices.</p>}
           <div className="space-y-3">
             {result.offers.map(offer => (
               <article key={offer.id} className="rounded-lg border p-4">
@@ -298,7 +296,8 @@ export function AlpsPublicQuotePanel() {
                     <p className="font-display text-2xl font-extrabold tabular-nums">
                       {formatMoney(offer.price)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Public live quote · Not bookable here</p>
+                    <p className="text-xs text-muted-foreground">Total transfer price · Includes VAT</p>
+                    <AlpsBookingLink offer={offer} expired={expired} />
                   </div>
                 </div>
               </article>
@@ -325,7 +324,7 @@ export function AlpsPublicQuotePanel() {
             )}
           {result.status === "http_error" ? ` (HTTP ${result.httpStatus})` : ""}
           <p className="mt-1 text-xs text-muted-foreground">
-            No credentials, booking links, or raw provider payloads are shown.
+            Update your search details or try again later.
           </p>
         </div>
       )}

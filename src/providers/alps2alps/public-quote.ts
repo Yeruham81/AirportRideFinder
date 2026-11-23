@@ -1,10 +1,11 @@
 /**
- * Read-only Alps2Alps Public API. Client-side, no credentials and no
- * bookings, redirects, affiliate markers, or checkout actions.
- * All browser calls are opt-in and use the two published GET endpoints.
+ * Keyless, quote-only Public API with supplier-issued affiliate links.
+ * Only an explicit user click opens checkout; API calls never create bookings.
  */
 import { moneyFromDecimal, type Money } from "@/domain/money";
 import { isValidDateString, isValidTimeString, isPastPickup } from "@/domain/time";
+import { ALPS_PARTNER_CODE, ALPS_QUOTE_MAX_AGE_MS, isAlpsBookingUrl } from "./booking-link";
+export { ALPS_PARTNER_CODE, ALPS_QUOTE_MAX_AGE_MS } from "./booking-link";
 
 const PUBLIC_BASE = "https://booking.alps2alps.com/api/public/v1";
 export const ALPS_PUBLIC_QUOTE_ENDPOINT = `${PUBLIC_BASE}/transfer-options` as const;
@@ -19,15 +20,16 @@ export const ALPS_INITIAL_TO = {
   code: "resort-11", name: "Chamonix", type: "resort", country: "France",
 } as const;
 
-/**
- * Observed supplier-season heuristic, NOT a published contractual cutoff.
- * Verified for 2026-11-13, 2026-12-01, 2027-04-30 and 2027-05-01.
- * We still validate provider-echoed baggage and explicitly warn if it differs.
- */
-export function alpsSeasonalBagMode(date: string): "winter" | "summer" | null {
-  if (!isValidDateString(date)) return null;
-  const month = Number(date.slice(5, 7));
-  return month === 12 || month <= 4 ? "winter" : "summer";
+export type AlpsBagMode = "winter" | "summer";
+
+/** Resolve the supplier's current season from an OMITTED-baggage response. */
+export function alpsSeasonalBagMode(luggage: unknown): AlpsBagMode | null {
+  const extras = record(luggage);
+  const suitcases = within(extras?.["normal_suitcases"]);
+  const skis = within(extras?.["ski_bags"]);
+  if (suitcases === 0 && skis !== null && skis > 0) return "winter";
+  if (skis === 0 && suitcases !== null && suitcases > 0) return "summer";
+  return null;
 }
 
 export type AlpsPublicCurrency = "EUR" | "GBP" | "USD";
@@ -43,6 +45,10 @@ export interface AlpsPublicQuoteQuery {
   date: string;
   time: string;
   passengers: number;
+  children?: number;
+  infants?: number;
+  childSeats?: number;
+  boosters?: number;
   luggage: number;
   skiBags: number;
   currency: AlpsPublicCurrency;
@@ -55,10 +61,15 @@ export interface AlpsPublicOffer {
   price: Money;
   pickupTime: string;
   source: "public_live";
-  actionable: false;
+  providerId: "alps2alps";
+  actionable: boolean;
+  /** Exact supplier string; never rebuilt or decorated. */
+  bookingUrl: string | null;
+  quotedAt: number;
+  expiresAt: number;
 }
 export type AlpsPublicQuoteResult =
-  | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "no_offers" | "route_unavailable" }
+  | { status: "invalid" | "timeout" | "network_error" | "rate_limited" | "malformed_response" | "no_offers" | "route_unavailable" | "season_unavailable" | "ski_unavailable" }
   | { status: "http_error"; httpStatus: number }
   | { status: "quote_mismatch"; field: AlpsQuoteMismatchField; requested?: number; quoted?: number }
   | {
@@ -67,19 +78,12 @@ export type AlpsPublicQuoteResult =
       pickupTime: string;
       luggage: number;
       skiBags: number;
-      /** Supplier actually quoted zero ski bags; no requested bags are included. */
-      bagAdjustment?: {
-        requestedSkiBags: number;
-        quotedSkiBags: 0;
-      };
-      /** Supplier did not quote the requested standard suitcases (often winter mode). */
-      suitcaseAdjustment?: {
-        requestedSuitcases: number;
-        quotedSuitcases: 0;
-      };
+      bagMode: AlpsBagMode;
+      discountPercent: number | null;
+      quotedAt: number;
+      expiresAt: number;
       route: { from: string; to: string };
-      /** Diagnostics only. Never expose or launch vendor-provided checkout URLs. */
-      linkEvidence: { quoteUrlPresent: boolean; vehicleUrlsPresent: number };
+      quoteUrl: string | null;
     };
 
 export type AlpsLocationSearchResult =
@@ -138,7 +142,11 @@ export function validateAlpsPublicQuery(
   query: AlpsPublicQuoteQuery,
   now = new Date(),
 ): boolean {
-  return validAlpsLocationCode(query.from) && validAlpsLocationCode(query.to) &&
+  const counts = [query.children ?? 0, query.infants ?? 0, query.childSeats ?? 0, query.boosters ?? 0];
+  return counts.every(n => Number.isSafeInteger(n) && n >= 0 && n <= 15) &&
+    query.passengers + (query.children ?? 0) + (query.infants ?? 0) <= 16 &&
+    (query.childSeats ?? 0) + (query.boosters ?? 0) <= (query.children ?? 0) + (query.infants ?? 0) &&
+    validAlpsLocationCode(query.from) && validAlpsLocationCode(query.to) &&
     query.from !== query.to &&
     isValidDateString(query.date) && isValidTimeString(query.time) &&
     // Supported Alpine destinations use Central European local pickup time.
@@ -149,7 +157,7 @@ export function validateAlpsPublicQuery(
     knownCurrency(query.currency);
 }
 
-export function buildAlpsPublicQuoteUrl(query: AlpsPublicQuoteQuery): string {
+export function buildAlpsPublicQuoteUrl(query: AlpsPublicQuoteQuery, bagMode?: AlpsBagMode): string {
   if (!validateAlpsPublicQuery(query)) throw new Error("Invalid Alps public quote request");
   const url = new URL(ALPS_PUBLIC_QUOTE_ENDPOINT);
   url.searchParams.set("from", query.from);
@@ -157,12 +165,20 @@ export function buildAlpsPublicQuoteUrl(query: AlpsPublicQuoteQuery): string {
   url.searchParams.set("date", query.date);
   url.searchParams.set("time", query.time);
   url.searchParams.set("adults", String(query.passengers));
-  url.searchParams.set("luggage", String(query.luggage));
-  url.searchParams.set("ski_bags", String(query.skiBags));
-  url.searchParams.set("ski", query.skiBags > 0 ? "1" : "0");
+  url.searchParams.set("children", String(query.children ?? 0));
+  url.searchParams.set("infants", String(query.infants ?? 0));
+  url.searchParams.set("child_seats", String(query.childSeats ?? 0));
+  url.searchParams.set("boosters", String(query.boosters ?? 0));
+  if (bagMode) {
+    // Laura's 23 Nov contract: winter uses ONE count for all physical bags.
+    const skiBags = bagMode === "winter" ? query.luggage + query.skiBags : 0;
+    url.searchParams.set("luggage", String(bagMode === "summer" ? query.luggage : 0));
+    url.searchParams.set("ski_bags", String(skiBags));
+    url.searchParams.set("ski", skiBags > 0 ? "1" : "0");
+  }
   url.searchParams.set("is_flight", "0"); // Treat time as the pickup time, not flight arrival.
   url.searchParams.set("currency", query.currency);
-  // Attribution / discount semantics are unconfirmed. No pc, promo, source or deep links.
+  url.searchParams.set("pc", ALPS_PARTNER_CODE);
   return url.toString();
 }
 
@@ -263,110 +279,98 @@ export function buildAlpsLocationSearchUrl(term: string): string {
 }
 
 function safeVendorUrl(
-  input: unknown, path: "quote" | "vehicle",
-  query: AlpsPublicQuoteQuery, vehicleId?: number,
-): boolean {
-  if (typeof input !== "string" || input.length > 4096) return false;
-  try {
-    const url = new URL(input);
-    if (url.origin !== "https://booking.alps2alps.com" ||
-      (path === "quote" && !["/book/quick-search", "/booking/quick-search"].includes(url.pathname)) ||
-      (path === "vehicle" && !["/book/quick-checkout", "/booking/quick-checkout"].includes(url.pathname)))
-      return false;
-    if (url.searchParams.get("from") !== query.from ||
-      url.searchParams.get("to") !== query.to ||
-      url.searchParams.get("date") !== query.date ||
-      url.searchParams.get("time") !== query.time) return false;
-    if (path === "vehicle" && url.searchParams.get("vehicle") !== String(vehicleId)) return false;
-    return true;
-  } catch { return false; }
+  input: unknown, kind: "quote" | "vehicle", query: AlpsPublicQuoteQuery,
+  bagMode: AlpsBagMode, vehicleId?: number,
+): string | null {
+  if (!isAlpsBookingUrl(input, kind)) return null;
+  const params = new URL(input).searchParams;
+  const expected = new URL(buildAlpsPublicQuoteUrl(query, bagMode)).searchParams;
+  for (const [key, value] of expected) {
+    // The supplier may omit fields whose documented default is zero or EUR.
+    const actual = params.get(key) ?? (["children", "infants", "child_seats", "boosters"].includes(key)
+      ? "0" : key === "currency" ? "EUR" : null);
+    if (actual !== value) return null;
+  }
+  if (kind === "vehicle" && params.get("vehicle") !== String(vehicleId)) return null;
+  return input;
 }
 
-/** Strict response normalization, discard booking_url and quote_url values. */
-export function parseAlpsPublicQuote(
-  body: unknown, query: AlpsPublicQuoteQuery,
-): AlpsPublicQuoteResult {
+function quoteIdentityError(body: unknown, query: AlpsPublicQuoteQuery): AlpsPublicQuoteResult | null {
   const root = record(body);
   const route = record(root?.["route"]);
   const outbound = record(root?.["outbound"]);
   const passengers = record(root?.["passengers"]);
-  const extras = record(outbound?.["luggage"]);
-  const fromName = safeLabel(route?.["from"]);
-  const toName = safeLabel(route?.["to"]);
-  if (!root || !route || !outbound || !passengers || !fromName || !toName ||
-    !Array.isArray(outbound["vehicles"])) return { status: "malformed_response" };
+  if (!root || !route || !outbound || !passengers || !safeLabel(route["from"]) ||
+    !safeLabel(route["to"]) || !Array.isArray(outbound["vehicles"]) || root["return"] != null)
+    return { status: "malformed_response" };
   if (root["currency"] !== query.currency) return { status: "quote_mismatch", field: "currency" };
   if (route["from_code"] !== query.from || route["to_code"] !== query.to)
     return { status: "quote_mismatch", field: "route" };
-  if (passengers["adults"] !== query.passengers)
+  const expected = { adults: query.passengers, children: query.children ?? 0,
+    infants: query.infants ?? 0, child_seats: query.childSeats ?? 0, boosters: query.boosters ?? 0 };
+  if (Object.entries(expected).some(([key, value]) => passengers[key] !== value))
     return { status: "quote_mismatch", field: "passengers" };
-  const pickup = outbound["pick_up_date_time"];
-  if (pickup !== `${query.date} ${query.time}:00`)
+  if (outbound["pick_up_date_time"] !== `${query.date} ${query.time}:00`)
     return { status: "quote_mismatch", field: "pickup_time" };
+  return null;
+}
+
+/** Preserve supplier prices and URLs; validate the complete requested basket. */
+export function parseAlpsPublicQuote(
+  body: unknown, query: AlpsPublicQuoteQuery, bagMode: AlpsBagMode, quotedAt = Date.now(),
+): AlpsPublicQuoteResult {
+  const identityError = quoteIdentityError(body, query);
+  if (identityError) return identityError;
+  const root = record(body)!;
+  const route = record(root["route"])!;
+  const outbound = record(root["outbound"])!;
+  const extras = record(outbound["luggage"]);
   const luggage = within(extras?.["normal_suitcases"]);
   const skiBags = within(extras?.["ski_bags"]);
-  // Summer ski bags are silently ignored by the provider. We never label this
-  // as a valid quote for a different baggage configuration.
-  if (luggage === null || skiBags === null) return { status: "malformed_response" };
-  // Symmetric safeguard: winter can ignore suitcases entirely. Show only
-  // the quote for zero suitcases with a prominent exclusion warning.
-  const adjustedSuitcases = query.luggage > 0 && luggage === 0
-    ? { requestedSuitcases: query.luggage, quotedSuitcases: 0 as const }
-    : undefined;
-  if (luggage !== query.luggage && !adjustedSuitcases)
-    return { status: "quote_mismatch", field: "suitcases", requested: query.luggage, quoted: luggage };
-  // Some supplier searches (confirmed in summer) ignore requested ski bags
-  // and quote zero. We may show the ALREADY RETURNED zero-bag quote without a
-  // second API request, but only with explicit disclosure and adjusted form
-  // state. Never imply that the original bags are included in that price.
-  const adjustedSkiBags = query.skiBags > 0 && skiBags === 0
-    ? { requestedSkiBags: query.skiBags, quotedSkiBags: 0 as const }
-    : undefined;
-  if (skiBags !== query.skiBags && !adjustedSkiBags)
-    return { status: "quote_mismatch", field: "ski_bags", requested: query.skiBags, quoted: skiBags };
+  const equipment = within(extras?.["ski_equipment"], 1);
+  if (luggage === null || skiBags === null || equipment === null) return { status: "malformed_response" };
+  if (bagMode === "summer" && query.skiBags > 0) return { status: "ski_unavailable" };
+  const expectedLuggage = bagMode === "summer" ? query.luggage : 0;
+  const expectedSkis = bagMode === "winter" ? query.luggage + query.skiBags : 0;
+  if (luggage !== expectedLuggage)
+    return { status: "quote_mismatch", field: "suitcases", requested: expectedLuggage, quoted: luggage };
+  if (skiBags !== expectedSkis || equipment !== (expectedSkis > 0 ? 1 : 0))
+    return { status: "quote_mismatch", field: "ski_bags", requested: expectedSkis, quoted: skiBags };
 
+  const expiresAt = quotedAt + ALPS_QUOTE_MAX_AGE_MS;
   const offers: AlpsPublicOffer[] = [];
-  let vehicleUrlsPresent = 0;
   const seen = new Set<number>();
-  for (const raw of outbound["vehicles"].slice(0, 100)) {
+  for (const raw of (outbound["vehicles"] as unknown[]).slice(0, 100)) {
     const item = record(raw);
     if (!item || item["offer_code"] !== "requested") continue;
     const vehicleId = within(item["vehicle_type_id"], 100000);
     const label = safeLabel(item["name"]);
     const price = money(item["price"], query.currency);
     if (vehicleId === null || vehicleId === 0 || !label || !price || seen.has(vehicleId)) continue;
-    const maxPassengers = within(item["max_passengers"]);
-    const maxLuggage = within(item["max_luggage"]);
-    if ((maxPassengers !== null && maxPassengers < query.passengers) ||
-      (maxLuggage !== null && maxLuggage < query.luggage)) continue;
     seen.add(vehicleId);
-    if (safeVendorUrl(item["booking_url"], "vehicle", query, vehicleId)) vehicleUrlsPresent++;
+    const bookingUrl = safeVendorUrl(item["booking_url"], "vehicle", query, bagMode, vehicleId);
+    // The provider already filtered vehicles for ALL passengers and bags.
+    // max_luggage describes suitcases and is not a winter total-bag capacity.
     offers.push({
-      id: `public-vehicle-${vehicleId}`,
-      vehicleLabel: label,
-      maxPassengers,
-      maxLuggage,
-      price,
-      pickupTime: String(pickup),
-      source: "public_live",
-      actionable: false,
+      id: `public-vehicle-${vehicleId}`, vehicleLabel: label,
+      maxPassengers: within(item["max_passengers"]), maxLuggage: within(item["max_luggage"]),
+      price, pickupTime: String(outbound["pick_up_date_time"]),
+      source: "public_live", providerId: "alps2alps", actionable: bookingUrl !== null,
+      bookingUrl, quotedAt, expiresAt,
     });
   }
   offers.sort((a, b) => a.price.minor - b.price.minor || a.id.localeCompare(b.id));
   if (!offers.length) return { status: "no_offers" };
+  const discount = record(root["promo_code_discount"]);
+  const discountPercent = root["promo_code_applied"] === true &&
+    root["promo_code"] === ALPS_PARTNER_CODE &&
+    ["percent", "percentage"].includes(String(discount?.["type"]))
+    ? within(discount?.["value"], 100) : null;
   return {
-    status: "ok",
-    offers,
-    pickupTime: String(pickup),
-    luggage,
-    skiBags,
-    ...(adjustedSkiBags ? { bagAdjustment: adjustedSkiBags } : {}),
-    ...(adjustedSuitcases ? { suitcaseAdjustment: adjustedSuitcases } : {}),
-    route: { from: fromName, to: toName },
-    linkEvidence: {
-      quoteUrlPresent: safeVendorUrl(root["quote_url"], "quote", query),
-      vehicleUrlsPresent,
-    },
+    status: "ok", offers, pickupTime: String(outbound["pick_up_date_time"]),
+    luggage, skiBags, bagMode, discountPercent, quotedAt, expiresAt,
+    route: { from: String(route["from"]), to: String(route["to"]) },
+    quoteUrl: safeVendorUrl(root["quote_url"], "quote", query, bagMode),
   };
 }
 
@@ -413,15 +417,46 @@ export async function fetchAlpsLocations(
   return locations ? { status: "ok", locations } : { status: "malformed_response" };
 }
 
+/** Browser-local pacing supplements the supplier's authoritative per-IP limit. */
+export class AlpsQuoteLimiter {
+  private requests: number[] = [];
+  private blockedUntil = 0;
+  constructor(private readonly now: () => number = () => Date.now()) {}
+  take(): boolean {
+    const now = this.now();
+    this.requests = this.requests.filter(time => time > now - 60_000);
+    if (now < this.blockedUntil || this.requests.length >= 20) return false;
+    this.requests.push(now);
+    return true;
+  }
+  backoff(): void { this.blockedUntil = this.now() + 60_000; }
+}
+const browserQuoteLimiter = new AlpsQuoteLimiter();
+
 export async function fetchAlpsPublicQuote(
   query: AlpsPublicQuoteQuery,
-  options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+  options: { fetchImpl?: typeof fetch; timeoutMs?: number; limiter?: AlpsQuoteLimiter } = {},
 ): Promise<AlpsPublicQuoteResult> {
   if (!validateAlpsPublicQuery(query)) return { status: "invalid" };
-  const response = await publicJson(
-    buildAlpsPublicQuoteUrl(query), options.fetchImpl ?? fetch, options.timeoutMs ?? 12000,
-  );
-  return response.status === "ok" ? parseAlpsPublicQuote(response.body, query) : response;
+  const limiter = options.limiter ?? browserQuoteLimiter;
+  const request = async (bagMode?: AlpsBagMode) => {
+    if (!limiter.take()) return { status: "rate_limited" } as const;
+    const answer = await publicJson(buildAlpsPublicQuoteUrl(query, bagMode),
+      options.fetchImpl ?? fetch, options.timeoutMs ?? 12000);
+    if (answer.status === "rate_limited") limiter.backoff();
+    return answer;
+  };
+  // Omit BOTH baggage parameters to learn this journey's current season.
+  // Discovery prices are discarded; only the second, explicit basket is shown.
+  const discovery = await request();
+  if (discovery.status !== "ok") return discovery;
+  const identityError = quoteIdentityError(discovery.body, query);
+  if (identityError) return identityError;
+  const bagMode = alpsSeasonalBagMode(record(record(discovery.body)?.["outbound"])?.["luggage"]);
+  if (!bagMode) return { status: "season_unavailable" };
+  if (bagMode === "summer" && query.skiBags > 0) return { status: "ski_unavailable" };
+  const response = await request(bagMode);
+  return response.status === "ok" ? parseAlpsPublicQuote(response.body, query, bagMode) : response;
 }
 
 /** One catalog GET per private page mount; no typed-query network calls needed. */

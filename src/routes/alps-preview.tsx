@@ -84,11 +84,11 @@ function AlpsSandboxPreview() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <header className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-teal-soft/40 p-6 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wider text-teal">Restricted integration test · Alps2Alps · Not a public booking page</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-teal">Private integration preview · Alps2Alps</p>
         <h1 className="mt-2 font-display text-2xl font-extrabold">Alps2Alps — API integration preview</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          A separate development-only preview for testing the Amitours B2B API v2.
-          No bookings, payment operations, affiliate redirects, or public search integration.
+          Test live Public API prices and supplier booking links, with a separate Amitours B2B sandbox below.
+          Complete bookings and payment directly with Alps2Alps.
         </p>
       </header>
 

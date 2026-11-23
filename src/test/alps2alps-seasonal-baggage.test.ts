@@ -1,96 +1,84 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  alpsSeasonalBagMode, buildAlpsPublicQuoteUrl,
-  parseAlpsPublicQuote, type AlpsPublicQuoteQuery,
+  alpsSeasonalBagMode, AlpsQuoteLimiter, fetchAlpsPublicQuote, parseAlpsPublicQuote,
 } from "@/providers/alps2alps/public-quote";
+import { alpsQuery, alpsResponse, alpsResponseForUrl } from "./alps-public-fixtures";
 
-const base: AlpsPublicQuoteQuery = {
-  from: "airport-1", to: "resort-11",
-  date: "2027-01-22", time: "14:00",
-  passengers: 3, luggage: 3, skiBags: 3, currency: "EUR",
-};
-function quote(query: AlpsPublicQuoteQuery, suitcases: number, skiBags: number) {
-  return {
-    currency: query.currency,
-    route: {
-      from_code: query.from, to_code: query.to,
-      from: "Geneva Airport", to: "Chamonix",
-    },
-    passengers: { adults: query.passengers },
-    outbound: {
-      pick_up_date_time: `${query.date} ${query.time}:00`,
-      luggage: {
-        normal_suitcases: suitcases,
-        ski_bags: skiBags,
-      },
-      vehicles: [{
-        vehicle_type_id: 2, name: "Economy", price: 149.50,
-        max_passengers: 4, max_luggage: 8, offer_code: "requested",
-      }],
-    },
-  };
-}
-
-describe("Alps2Alps observed seasonal baggage policy (non-contractual dates)", () => {
-  it("uses observed 1 December and 1 May cutovers, including year wrap", () => {
-    for (const d of ["2026-12-01", "2026-12-31", "2027-01-01", "2027-04-30", "2028-02-29"]) {
-      expect(alpsSeasonalBagMode(d)).toBe("winter");
-    }
-    for (const d of ["2026-11-13", "2026-11-30", "2027-05-01", "2027-10-31", "2027-11-01"]) {
-      expect(alpsSeasonalBagMode(d)).toBe("summer");
-    }
-    for (const d of ["", "2027-02-30", "junk", "2027-13-01"]) {
-      expect(alpsSeasonalBagMode(d)).toBeNull();
+describe("Alps2Alps response-driven baggage policy", () => {
+  it("resolves the supplier mode from default bag counts, never calendar dates", () => {
+    expect(alpsSeasonalBagMode({ normal_suitcases: 0, ski_bags: 2 })).toBe("winter");
+    expect(alpsSeasonalBagMode({ normal_suitcases: 2, ski_bags: 0 })).toBe("summer");
+    for (const value of [null, {}, { normal_suitcases: 0, ski_bags: 0 },
+      { normal_suitcases: 2, ski_bags: 2 }, "2031-01-16"]) {
+      expect(alpsSeasonalBagMode(value)).toBeNull();
     }
   });
 
-  it("normalizes dropped winter suitcases only with an explicit exclusion object and no booking", () => {
-    const r = parseAlpsPublicQuote(quote(base, 0, 3), base);
-    expect(r.status).toBe("ok");
-    if (r.status !== "ok") throw Error();
-    expect(r.suitcaseAdjustment).toEqual({ requestedSuitcases: 3, quotedSuitcases: 0 });
-    expect(r.bagAdjustment).toBeUndefined();
-    expect(r.luggage).toBe(0);
-    expect(r.skiBags).toBe(3);
-    expect(r.offers).toHaveLength(1);
-    expect(r.offers[0]).toMatchObject({
-      price: { currency: "EUR", minor: 14950 }, actionable: false,
-    });
-    expect(JSON.stringify(r)).not.toContain("booking_url");
-  });
-
-  it("accepts either season's zero-other-bag quote without requiring corrections", () => {
-    const winter: AlpsPublicQuoteQuery = { ...base, luggage: 0 };
-    const summer: AlpsPublicQuoteQuery = {
-      ...base, date: "2027-07-22", luggage: 3, skiBags: 0,
-    };
-    for (const [q, suitcases, skis] of [
-      [winter, 0, 3], [summer, 3, 0],
-    ] as const) {
-      const url = new URL(buildAlpsPublicQuoteUrl(q));
-      expect(url.searchParams.get("luggage")).toBe(String(suitcases));
-      expect(url.searchParams.get("ski_bags")).toBe(String(skis));
-      const r = parseAlpsPublicQuote(quote(q, suitcases, skis), q);
-      expect(r.status).toBe("ok");
-      if (r.status !== "ok") throw Error();
-      expect(r.suitcaseAdjustment).toBeUndefined();
-      expect(r.bagAdjustment).toBeUndefined();
+  it("discovers winter and requests 2 suitcases + 2 ski bags as ski_bags=4", async () => {
+    const fetchImpl = vi.fn(async (url: string) => Response.json(alpsResponseForUrl(url, "winter")));
+    const result = await fetchAlpsPublicQuote(alpsQuery, { fetchImpl: fetchImpl as unknown as typeof fetch, limiter: new AlpsQuoteLimiter() });
+    if (result.status !== "ok") throw Error(result.status);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const [discovery, final] = fetchImpl.mock.calls.map(([url]) => new URL(url));
+    expect(discovery!.searchParams.has("ski_bags")).toBe(false);
+    expect(discovery!.searchParams.has("luggage")).toBe(false);
+    expect(final!.searchParams.get("ski_bags")).toBe("4");
+    expect(final!.searchParams.get("luggage")).toBe("0");
+    expect(result).toMatchObject({ bagMode: "winter", luggage: 0, skiBags: 4 });
+    expect(result.offers[0]!.price.minor).toBe(27249);
+    for (const [, init] of fetchImpl.mock.calls as unknown as [string, RequestInit][]) {
+      expect(init).toMatchObject({ method: "GET", cache: "no-store", credentials: "omit" });
     }
   });
 
-  it("does not accept arbitrary partial bag reductions or different passenger details", () => {
-    const partial = parseAlpsPublicQuote(quote(base, 2, 3), base);
-    expect(partial).toEqual({
-      status: "quote_mismatch", field: "suitcases", requested: 3, quoted: 2,
+  it("honours a supplier season change even when January resolves to summer", async () => {
+    const query = { ...alpsQuery, skiBags: 0, luggage: 3 };
+    const fetchImpl = vi.fn(async (url: string) => Response.json(alpsResponseForUrl(url, "summer")));
+    const result = await fetchAlpsPublicQuote(query, { fetchImpl: fetchImpl as unknown as typeof fetch, limiter: new AlpsQuoteLimiter() });
+    expect(result).toMatchObject({ status: "ok", bagMode: "summer", luggage: 3, skiBags: 0 });
+    expect(new URL(fetchImpl.mock.calls[1]![0]).searchParams.get("luggage")).toBe("3");
+  });
+
+  it("keeps zero-bag winter searches at zero so the supplier can return sedans", async () => {
+    const query = { ...alpsQuery, luggage: 0, skiBags: 0 };
+    const fetchImpl = vi.fn(async (url: string) => Response.json(alpsResponseForUrl(url, "winter")));
+    expect(await fetchAlpsPublicQuote(query, { fetchImpl: fetchImpl as unknown as typeof fetch, limiter: new AlpsQuoteLimiter() }))
+      .toMatchObject({ status: "ok", skiBags: 0 });
+    const final = new URL(fetchImpl.mock.calls[1]![0]);
+    expect(final.searchParams.get("ski_bags")).toBe("0");
+    expect(final.searchParams.get("ski")).toBe("0");
+  });
+
+  it("retains summer ski requirements and stops rather than presenting an incomplete quote", async () => {
+    const fetchImpl = vi.fn(async (url: string) => Response.json(alpsResponseForUrl(url, "summer")));
+    expect(await fetchAlpsPublicQuote(alpsQuery, { fetchImpl: fetchImpl as unknown as typeof fetch, limiter: new AlpsQuoteLimiter() }))
+      .toEqual({ status: "ski_unavailable" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects ambiguous season discovery and changed trip details before requesting a final price", async () => {
+    for (const invalid of ["season", "passengers"]) {
+      const body = alpsResponse(alpsQuery, "winter", true);
+      if (invalid === "season") body.outbound.luggage.ski_bags = 0;
+      else body.passengers.children = 0;
+      const fetchImpl = vi.fn(async () => Response.json(body));
+      const result = await fetchAlpsPublicQuote(alpsQuery, { fetchImpl: fetchImpl as unknown as typeof fetch, limiter: new AlpsQuoteLimiter() });
+      expect(result.status).toBe(invalid === "season" ? "season_unavailable" : "quote_mismatch");
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("rejects an ignored or partially reduced final bag count", () => {
+    for (const count of [0, 1, 3]) {
+      const body = alpsResponse(); body.outbound.luggage.ski_bags = count;
+      expect(parseAlpsPublicQuote(body, alpsQuery, "winter")).toMatchObject({
+        status: "quote_mismatch", field: "ski_bags", requested: 4, quoted: count,
+      });
+    }
+    const query = { ...alpsQuery, skiBags: 0 };
+    const body = alpsResponse(query, "summer"); body.outbound.luggage.normal_suitcases = 0;
+    expect(parseAlpsPublicQuote(body, query, "summer")).toMatchObject({
+      status: "quote_mismatch", field: "suitcases", requested: 2, quoted: 0,
     });
-    const wrongSkis = parseAlpsPublicQuote(quote(base, 0, 1), base);
-    expect(wrongSkis).toEqual({
-      status: "quote_mismatch", field: "ski_bags", requested: 3, quoted: 1,
-    });
-    const wrongPassengers = {
-      ...quote(base, 0, 3), passengers: { adults: 4 },
-    };
-    expect(parseAlpsPublicQuote(wrongPassengers, base))
-      .toEqual({ status: "quote_mismatch", field: "passengers" });
   });
 });

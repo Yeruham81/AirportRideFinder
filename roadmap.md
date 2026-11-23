@@ -31,34 +31,20 @@
 - [ ] Perform protected end-to-end browser preview with the real Intui data, before enabling public comparison
 - [ ] Public comparison and redirects — not started. Requires provider tracking/affiliate attribution and safe live-mode UX; no booking/payment integration.
 
-## Alps2Alps / Amitours — initial B2B v2 sandbox evaluation
-- [x] Server-only, allowlisted sandbox token, vehicle catalog and private-transfer quote client
-- [x] Separate noindex /alps-preview behind an existing strong preview password, independent signed cookie and bounded quotas
-- [x] User-triggered Geneva → Chamonix sandbox-only price preview with explicit non-booking disclaimer
-- [x] Mock-only unit tests for price normalization, fail-closed API transport and zero unintended bookings
-- [x] Hosting preview enabled; first real B2B sandbox authentication request fails with `network_error` at POST /token. Independent GitHub runner HTTP confirms endpoint responds (400 for dummy credentials).
-- [x] Add separate credential-free, browser-side GET public quote diagnostic in protected /alps-preview; independently validated HTTP 200 and correct JSON fields for Geneva → Chamonix.
-- [x] Confirm Public API from hosted browser: six live public prices, EUR 200–418.50, pickup 13-Nov-2026 at 14:00 local, 2 suitcases and 0 ski bags, no booking created.
-- [x] Add manual vendor location search, dynamic one-way routes, swap direction, EUR/GBP/USD, passenger and suitcase/ski-bag inputs; strictly confirm provider echoed values.
-- [x] Validate provider booking-link structure as non-actionable metadata only; no deep-link navigation or commission claims.
-- [x] Replace manual location search button with first-character autocomplete backed by the supplier's verified active-route directory (4,316 active rows; 6 Nov 2026), with keyboard/mouse selection and active-pair filtering.
-- [x] Diagnose reported generic `malformed_response`: distinguish mismatched quote fields and explain supplier's summer policy of ignoring ski bags instead of presenting a different quote.
-- [x] Automatically show the already-returned provider zero-ski-bag prices if original search requested more: adjust input to 0 and display an explicit exclusion warning, no extra API call, no fake luggage inclusion.
-- [x] Confirm first-character autocomplete in hosted browser (user verified), and zero-ski-bag fallback: 6 genuine offers displayed with explicit exclusion notice.
-- [x] Simplify the exclusion notice while keeping the requested count, quoted 0, and carriage/fees warning.
-- [ ] Test several dynamic routes and nonzero ski bags from hosted private page; verify no out-of-date/changed quote is displayed.
-- [ ] Compare two real public API quotes against provider checkout (exact route, time, vehicle, passengers, luggage, EUR total); do not complete payment.
-- [ ] Validate supplier-provided vehicle URLs in controlled preview without enabling affiliate redirects; confirm customer-facing quote details and return behavior.
-- [x] Verify winter ski-bag handling: no-secret public GET returned 3 confirmed ski bags for 3 passengers on Geneva→Chamonix (22 Jan 2027) and Geneva→Avoriaz (11 Feb 2027); these responses unexpectedly confirmed 0 ordinary suitcases although 3 were requested.
-- [x] Verify date-specific supplier quote behavior across seasons: Dec–Apr echoes requested ski bags and 0 suitcases, May–Nov echoes requested suitcases and 0 ski bags (11 independent GET probes; 12th HTTP 429 stopped).
-- [x] Simplify private baggage search to only the provider-supported seasonal select (ski bags Dec–Apr, suitcases May–Nov), with explicit 0 for the inactive type, strict quote reconciliation and unobtrusive fallback notices if the supplier changes its behavior.
-- [ ] Verify that Dec 1 / May 1 cutoff dates are official (observed, not published) and stable in future years; confirm with Laura whether both baggage types can be carried together and how to quote/charge them.
-- [ ] Confirm affiliate attribution for AIRPORTRIDEFINDER in API-generated checkout links, and permission for side-by-side competitor comparison, with Laura (one consolidated email after tests).
-- [ ] Establish production quote rate limits, freshness/cache policy and safe 429 retry behavior; avoid assuming unlimited browser-side GETs.
-- [ ] Consider return trips, children/child seats and cancellation terms after core one-way referral flow is approved.
-- [ ] Resolve B2B sandbox auth egress / access problem if B2B remains necessary.
-- [ ] Decide Public Booking API vs B2B v2 with Laura and confirm competitor display, affiliate attribution, fees and rate limits
-- [ ] Production access and tracked redirects — not started
+## Alps2Alps — Public API referral integration (23 November 2026)
+- [x] Laura confirmed Public API suitability, AIRPORTRIDEFINDER attribution, 5% customer discount, 10% completed-transfer commission, reporting and payout terms.
+- [x] Send `pc=AIRPORTRIDEFINDER`; preserve supplier prices and validate/use returned links unchanged through the redirect resolver.
+- [x] Keep authenticated, noindex `/alps-preview` and existing route-directory autocomplete; isolate live quotes from the fictional comparison registry.
+- [x] Resolve seasonal baggage mode from API defaults instead of calendar cutoffs; combine suitcases and ski bags into the winter count, including explicit zero-bag searches.
+- [x] Add children, infants, child seats and boosters with full request/response reconciliation; keep both bag selectors visible.
+- [x] Use supplier-filtered vehicles; reject incomplete baggage quotes and preserve summer ski requirements.
+- [x] No-store prices, 60-second local quote expiry, 20 raw quote requests/minute browser pacing and HTTP 429 cooldown; no automatic price polling or retries.
+- [x] Mocked contract/UI tests for partner links, unchanged discount prices, configurable seasons, whole-group counts, expiry and invalidated searches.
+- [ ] Verify the deployed private preview in a browser and compare exact trip details against the supplier landing page.
+- [ ] Confirm actual completed-booking attribution in the partner dashboard when a real customer booking is available.
+- [ ] Roll out a public real-data comparison flow separately, with appropriate shared-IP rate controls and provider-specific production readiness.
+- [ ] Add return journeys and cancellation-policy data when required.
+- Existing B2B sandbox diagnostic is retained separately; its legacy hosted token-connectivity issue is not required for Public API referrals.
 
 ## Later (needs approval)
 - Phase 2B+ — not started

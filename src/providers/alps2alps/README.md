@@ -1,319 +1,100 @@
-# Alps2Alps / Amitours API integration — isolated sandbox
+# Alps2Alps Public API referral integration
 
-**Status:** development-only, read-only **preview**, not a production affiliate
-or booking integration. AirportRideFinder has no public live comparison engine;
-the public `/search` route remains a fictional four-provider demonstration.
-Alps2Alps is NOT added to `src/providers/registry.ts`.
+The protected, noindex `/alps-preview` route quotes real one-way transfers and
+shows supplier-issued affiliate booking links. It remains separate from the
+fictional `/search` comparison and is not registered in the mock provider registry.
+The authenticated B2B sandbox below it remains a separate legacy diagnostic.
 
-## Verified vendor technical contract
+## Confirmed supplier contract — Laura, 23 November 2026
 
-Official B2B API v2: https://www.amitours.com/developer
-- Fixed development host: `https://sandbox.amitours.com/api/v2`. No
-  production fallback and no arbitrary host override.
-- `POST /token` with `api_key` and `api_secret` server-side produces a
-  one-day Bearer token. For this diagnostic, request a fresh token only after
-  authorized user action. Neither credentials nor token reach the browser.
-- `GET /vehicles` supplies official vehicle name and max passenger capacity
-  for each `vehicle_type_id`. Missing or invalid metadata remains unknown.
-- `POST /transfer` creates a **sandbox transfer request with offer prices**.
-  This is not a booking. **Never call** `/booking`,
-  `/shuttle-booking` or payment/checkout endpoints.
-- Returned B2B prices are in EUR. Show only `requested-*` offers matching
-  the requested pickup time; skip `off_peak-*` alternatives rather than
-  presenting them as the same service.
-- `POST /transfer` is not a purely stateless quotation endpoint: it creates
-  a transfer *request record*, which is why our UI calls it only after the
-  user explicitly selects **Search sandbox quotes**.
-- Provider referral mechanism and affiliate commission attribution from
-  API-generated links remain **unverified**. Affiliate promo code
-  `AIRPORTRIDEFINDER` is intentionally NOT sent to these endpoints
-  or added to an unsupported redirect.
-- An unauthenticated Public Booking API also exists at
-  https://www.alps2alps.com/developers/public-api/ and returns
-  `quote_url` and per-vehicle `booking_url` values. We do not use
-  these links until the provider confirms affiliate attribution and
-  price-comparison permissions.
+- The keyless Public API is sufficient for comparison and referral. The
+  authenticated B2B API is for creating/managing bookings and is unnecessary here.
+- Send `pc=AIRPORTRIDEFINDER` to `GET /api/public/v1/transfer-options`.
+  Returned prices already include any applied customer discount (5% for private
+  transfers). Never subtract it again or add markup.
+- Use `quote_url` and vehicle `booking_url` exactly as returned. The supplier
+  includes the partner code. Validate the host, route, trip, vehicle and code;
+  never reconstruct a missing link or append tracking to the returned string.
+- Commission is 10% of the completed transfer price including VAT. Attribution
+  follows the customer visit; there is no later cookie window. Replacing the code,
+  cancellations and refunds can remove attribution/commission. Reporting uses the
+  transfer month. EUR bank payouts have a EUR 100 threshold and are requested by
+  email; monthly or end-of-season payment is available.
+- Include adults, children and infants. Child-seat and booster counts are sent
+  separately and reconciled against the response; these seats are free.
+- Prices are recalculated when the customer follows the booking link. PayPal
+  charges, live currency rates, trip changes and an old quote can change the total.
+- The supplier permits 20 price requests per minute per IP.
 
-## Setup in hosting configuration
+Technical reference: https://www.alps2alps.com/developers/public-api/
+Laura's direct clarification takes precedence where the public guide is less
+specific, especially for combined winter baggage and the `pc` parameter.
 
-Required existing server-only hosting secrets:
-- `ALPS2ALPS_SANDBOX_API_KEY`
-- `ALPS2ALPS_SANDBOX_API_SECRET`
-- `INTUI_PREVIEW_ACCESS_PASSWORD` (existing strong private preview password)
-- `INTUI_PREVIEW_SESSION_SECRET` (existing strong signing secret)
+## Baggage and pricing flow
 
-One **additional opt-in** variable:
+Season dates are configurable at the supplier. Never hard-code December/May.
+Each manually submitted search makes at most **two** quote-only GET requests:
+
+1. Omit `luggage`, `ski_bags` and `ski` to retrieve seasonal defaults. Validate
+   route, time, currency and every passenger/seat count. Discard these prices.
+   Read `outbound.luggage`: positive ski defaults with zero suitcases identify
+   winter; positive suitcase defaults with zero ski bags identify summer.
+   Ambiguous defaults stop the search rather than guessing.
+2. Request the complete explicit baggage basket:
+   - Winter: `ski_bags = suitcases + ski/snowboard bags`, `luggage=0`,
+     `ski=1` when the combined total is positive. Zero bags stays explicitly zero.
+   - Summer: `luggage = suitcases`, `ski_bags=0`, `ski=0`. A request containing
+     ski equipment needs supplier confirmation; do not drop the user's bags or
+     display a suitcase-only quote as covering them.
+
+Validate the final echoed counts exactly. A dropped or partially reduced count
+is an error. Both bag selectors remain visible, and winter results explain that
+the supplier groups the bags into one count. Returned vehicles are already
+filtered by the supplier; `max_luggage` is suitcase metadata and must not be used
+to re-filter the winter combined count.
+
+## Freshness, links and request limits
+
+- Quote requests use `cache: no-store`; no price cache or background polling.
+- Results clear when any search field changes. In-flight old results cannot
+  replace a changed search. Links expire locally after **60 seconds** and require
+  another manual search. This is our refresh policy, not a supplier price lock.
+- Booking links pass through `redirect/resolveBookingLink`, including another
+  age/host/partner-code check. Only a manual click opens the supplier website.
+  No booking, payment or checkout API calls are made.
+- The 5% label appears only when the response confirms an applied partner promo
+  and percentage; the returned price remains unchanged if the promo is unavailable.
+- A browser-local rolling limiter counts both discovery and final price requests,
+  allowing at most 20 raw requests/minute (normally 10 full searches). HTTP 429
+  starts a 60-second cooldown; there is no automatic retry. This supplements,
+  rather than replaces, the supplier's per-IP limit shared by tabs/devices behind
+  the same address. A future server proxy needs shared/distributed pacing.
+
+## Access and existing B2B diagnostic
+
+The current hosting gate still uses:
+
 - `ALPS2ALPS_SANDBOX_PREVIEW_ENABLED=true`
+- `INTUI_PREVIEW_ACCESS_PASSWORD`
+- `INTUI_PREVIEW_SESSION_SECRET`
 
-All variables belong in hosting-side Secrets, not `VITE_*` and not GitHub
-source. When the flag is not exactly `true`, sandbox previews do not call
-the provider, even if credentials exist. Do not send secrets to ChatGPT.
-Do not rely on GitHub Actions secrets being available in Lovable or vice versa.
+The Public API requires **no provider secrets**. Existing B2B sandbox calls also
+require `ALPS2ALPS_SANDBOX_API_KEY` and `ALPS2ALPS_SANDBOX_API_SECRET` server-side.
+Those credentials never go to the browser. B2B calls remain allowlisted to
+`https://sandbox.amitours.com/api/v2`, with no production fallback. Legacy
+`POST /transfer` creates a sandbox request record, not a booking, and remains
+explicitly user-triggered. Its historical hosted `POST /token` network issue
+does not block the Public API flow.
 
-Open `/alps-preview` directly. The route is noindex and unlinked from the
-demo. It requires a password and signed HttpOnly secure same-site cookie,
-with a 30-minute session and bounded per-process/per-session rate limits.
-The initial loader **does not make any provider API request**. After login,
-press Search sandbox quotes for a single controlled, one-way
-Geneva Airport (`airport-1`) → Chamonix (`resort-11`) search. Dates/times
-are validated in Geneva local time and 1–16 adults accepted.
+Keep the existing private login, secure HttpOnly session and noindex settings.
+Wider public access still needs appropriate hosting access/rate controls and a
+separate real-data comparison rollout. Do not mix these prices with fictional
+provider offers.
 
-The sandbox previews are not production customer prices. No booking CTA,
-no raw API body, tracking link, token, or credential is serialized to the
-browser. Do not open this route to a public audience without a hosting-side
-Access/WAF gate and distributed rate limiting in front of the server
-functions. Existing in-memory limits are **per worker only**.
+## Verification
 
-## Hosted sandbox connectivity diagnostics (6 Nov 2026)
-
-The first Lovable-hosted sandbox search returned only `network_error`.
-The previous transport merged auth and quote network failures into one
-status. The private preview now reports a fixed, non-sensitive stage:
-`token` for POST /token, `transfer` for POST /transfer, or a separate
-vehicle-catalog warning when GET /vehicles is unreachable. Status/stage
-are allowlisted; raw exception messages and request headers are never
-returned to the client.
-
-An independent, **no-credentials** GitHub Actions probe confirmed that
-`sandbox.amitours.com` resolved in DNS, connected with verified TLS and
-responded HTTP 405 to HEAD on `/api/v2/token` (expected for a POST-only
-endpoint). This does **not** prove accessibility from the Lovable-hosted
-Cloudflare runtime; it narrows the question to runtime-dependent connectivity
-or a specific API request stage. The temporary diagnostic workflow was
-deleted before merging.
-
-After deployment, trigger **one** search again and record the fixed stage
-shown in the private preview. If stage=token and status=network_error,
-investigate outbound Cloudflare connections, origin IP restrictions or TLS
-compatibility; do not rotate working secrets without evidence. If the failure
-occurs only on transfer, investigate endpoint-specific access policies.
-Do not copy private credentials, raw request/response bodies or bearer tokens.
-
-## Public GET quote fallback (private diagnostic only)
-
-We verified on 6 Nov 2026, using **no secrets** and a separate GitHub
-Actions runner, that:
-- `POST https://sandbox.amitours.com/api/v2/token` with intentionally invalid
-  dummy credentials returned HTTP **400** with successful TLS (no transport
-  error). This establishes that the endpoint is reachable from the GitHub
-  runner, **not** from the Lovable/Cloudflare runtime.
-- `GET https://booking.alps2alps.com/api/public/v1/transfer-options` returned
-  HTTP **200** for Geneva Airport (`airport-1`) -> Chamonix (`resort-11`).
-  Actual JSON contained currency EUR, expected route/pickup/adult fields,
-  luggage fields and three `requested` vehicle offers. **No booking was
-  created.**
-- The temporary GitHub Actions connectivity workflow was removed before
-  merging; no API credentials were ever included in the workflow.
-
-Because the provider documents `Access-Control-Allow-Origin: *` for the
-keyless public endpoint and a stateless GET quote-only flow, an **independent
-private browser-side test** is now available on the existing authenticated
-`/alps-preview` route: **Test public quote (no key)**. This does not try to
-work around API access controls: it uses the official public endpoint expressly
-documented for browser calling. It is user-initiated, supports only the fixed
-Geneva -> Chamonix route, and uses the currently chosen local pickup date/time
-and adults, with explicitly selected suitcase count and zero ski bags.
-The GET request is non-booking and uses no API credentials, promo or affiliate
-tracking fields. The returned quote and booking URLs are intentionally ignored;
-the UI renders only validated route-correct prices, capacity, actual pickup
-time and provider-echoed luggage.
-
-**The Public API returns real public quotes, unlike the B2B sandbox.** The UI
-labels them clearly as private test-only, not public site offers, and warns that
-retail pricing, permission to compare offers and affiliate commission attribution
-still need verification with Laura. Do not copy these prices into the four-provider
-fictional demo or use them for a public comparison engine yet. The protected
-preview still needs hosting-side Access/WAF and shared limiter before wider access.
-Avoid repeated searches; the public API imposes its own rate limits.
-
-If the public browser test works while hosted B2B POST /token fails, that is
-consistent with an origin/Cloudflare egress-specific problem rather than a
-global Alps2Alps outage. To isolate B2B network failure further, hosting
-logs or provider network allowlisting may be needed. **Do not rotate API
-secrets solely because a fetch failed.**
-
-
-## Dynamic location and quote tests (6 Nov 2026)
-
-The authenticated, noindex `/alps-preview` now includes a full **Public API
-quote tester above the separate B2B Sandbox test**:
-- Enter at least two characters and click **Find locations** for either
-  endpoint. Each click uses the official unauthenticated,
-  rate-limited `GET /api/public/v1/locations/search?q=...` endpoint.
-  Select only a provider-returned result. Country and location type are
-  displayed because some names match more than one location code.
-  Both endpoints can be swapped; invalid or same-place combinations cannot
-  be quoted.
-- Choose Alpine-local pickup date/time, 1–16 adults, 0–8 suitcases,
-  0–8 ski/snowboard bags, and EUR / GBP / USD. The public quote request
-  remains an explicit click and a `GET /transfer-options` call only;
-  `is_flight=0` treats the entered time as literal local pickup, not
-  flight arrival. Baggage is sent explicitly, bypassing seasonal defaults.
-- Validate the exact vendor-echoed location codes, currency, passenger count,
-  pickup time, suitcases and ski bags. Unsupported routes show
-  `route_unavailable`; no made-up quote is ever displayed. For currencies
-  other than EUR, values can change because of exchange-rate updates.
-- Results remain **only in React state**, are cleared when search fields
-  change, and use the provider's validated price and capacity attributes.
-  The parser checks only whether returned vendor URLs have a known,
-  first-party structure and match the queried route/date/selected vehicle.
-  It returns the existence/number of matching links but **does not
-  expose, store, follow, click, or construct** any booking URLs.
-- No key, secret, affiliate `pc`/`promo`, backend order, or checkout action
-  is used. External rate limits apply; search is manual, never automatic
-  typeahead polling. The commercial permission and commission attribution
-  questions for Laura remain open; **do not send until testing is complete**.
-
-Public API technical reference:
-https://www.alps2alps.com/developers/public-api/
-
-The existing fixed-route **B2B Sandbox** controls remain separate and may
-continue to show `network_error` at `POST /token` in Lovable hosting.
-
-## Route-directory autocomplete and explained quote mismatches
-
-The private public-API test no longer requires **Find locations**. Once the
-authenticated preview mounts, it makes one **keyless GET** to the supplier's
-official active-route resource:
-`https://booking.alps2alps.com/api/resource/routes` (also linked by Laura).
-An independent no-credentials request on 6 Nov 2026 confirmed HTTP 200,
-CORS `*`, 4,351 route records and 4,316 active route rows (approximately
-815 KB). The one-time response supplies canonical `station`, `resort`,
-names and `is_active`. Only active, shape-valid rows are accepted. The
-picker filters those provider-supplied endpoints locally **from the first
-character**, supports accent-insensitive matching, keyboard ArrowDown/Up,
-Enter, Escape, or mouse selection; there are no per-keystroke quote calls.
-The destination suggestions are constrained to active supplier pairings from
-the chosen origin; choosing a different origin clears an incompatible
-previous destination. The vendor still checks availability at quote time.
-Only in case the master route catalog is unavailable, the picker falls back
-to the official public `GET /locations/search?q=...` endpoint, debounced
-after at least two typed characters as required by its documentation.
-The two pre-existing Geneva Airport and Chamonix sample locations are the
-only preloaded fallback suggestions and are actual verified supplier codes.
-
-A temporary, credential-free workflow verified that the live public GET
-`/transfer-options` echoed the selected November route/date/time, passenger
-count and luggage for Geneva Airport → Chamonix. For a **July** departure,
-the supplier returned `ski_bags=0` after receiving a request for two ski
-bags: its documented summer policy ignores ski bags. Previously the strict
-parser reported a generic `malformed_response`. The updated parser reports a non-sensitive `quote_mismatch` reason
-identifying which of route, currency, adult count, pickup time, suitcases
-or ski bags differed. If the **only** mismatch is that the supplier quoted
-**zero ski bags** rather than the requested positive quantity, the same
-supplier-confirmed prices are immediately displayed for **zero ski bags**
-without an additional API request. The search field is reset to 0 and a
-conspicuous warning states how many ski bags were originally requested,
-that they are **not included in the displayed price**, and that the
-traveler must clarify acceptance and any charges with Alps2Alps.
-This does not imply that ski baggage is free, accepted, or included.
-Other ski-bag mismatches (for example requesting 3 and receiving 1),
-or mismatches in route, currency, passengers, pickup, or suitcases remain
-rejected and cannot be silently normalized. A truly malformed upstream
-JSON shape still returns `malformed_response`; we never invent a quote.
-
-The route catalog request is automatic **only after authentication**;
-the real price GET remains manual. Neither catalog nor search uses provider
-API credentials, `AIRPORTRIDEFINDER` tracking code, booking endpoints or
-deep links. There is no public customer-facing comparison or booking flow.
-Supplier rate limits and separate host Access/WAF protections must still be
-respected for any wider use. The exploratory GitHub probe was deleted
-before merging.
-
-## Winter vs summer ski baggage verification (6 Nov 2026)
-
-The supplier's public developer guide describes **seasonal luggage rules**:
-summer searches ignore ski bags; winter searches support requested ski bags
-(and default to ski bags when unspecified). To avoid hiding a legitimately
-supported feature, we **retain the ski/snowboard bag selector** in the
-private test search.
-
-Two no-credentials, read-only public GET probes with 3 adults, 3 suitcases,
-3 ski bags and a 14:00 pickup confirmed:
-- Geneva Airport → Chamonix, **22 Jan 2027**: HTTP 200, 3 ski bags,
-  **0 ordinary suitcases**, 3 vehicle offers.
-- Geneva Airport → Avoriaz, **11 Feb 2027**: HTTP 200, 3 ski bags,
-  **0 ordinary suitcases**, 3 vehicle offers.
-
-Thus the original premise that *all* requests ignore ski bags is false,
-but the requested **combination** is not confirmed by the provider.
-The strict existing parser correctly rejects a three-suitcase quote if
-the supplier echoes zero ordinary suitcases; it must not silently show
-that price as covering all the requested luggage. Whether both categories
-can be transported together and how to obtain an accurate basket requires
-a supplier clarification. No booking was made and no actual credentials
-were used. The temporary probe workflow was removed after testing.
-
-Supplier reference:
-https://www.alps2alps.com/developers/public-api/#seasonal-extras-luggage-vs-skis
-
-## Season-aware one-field baggage search (6 Nov 2026)
-
-Read-only public quote probes for Geneva Airport → Chamonix, **3 adults,
-3 ordinary suitcases and 3 ski bags** returned the following provider-echoed
-baggage counts:
-
-| Pickup date | Suitcases quoted | Ski bags quoted |
-| --- | ---: | ---: |
-| 13 Nov 2026 | 3 | 0 |
-| 1 and 15 Dec 2026 | 0 | 3 |
-| 31 Mar, 1/15/30 Apr 2027 | 0 | 3 |
-| 1/15 May, 31 Oct, 1 Nov 2027 | 3 | 0 |
-
-These observations **suggest** winter baggage mode runs **1 December–
-30 April**, and summer mode **1 May–30 November**. These calendar cutovers
-are **not published or contractually guaranteed** in the provider's API
-documentation, which merely confirms the seasonal modes. The probe hit HTTP
-429 on the twelfth request (1 Dec 2027); we stopped on rate limit and removed
-the temporary read-only GitHub workflow.
-
-To minimize quote mismatches, the private quote form now displays just
-**ski/snowboard bags in winter** and **suitcases in summer**. The inactive
-baggage count is explicitly sent as **0** and never suggested as being
-included in the result. On a pickup-date change the relevant input changes
-without a second price request. The two stored input values are independent.
-The parser still verifies the exact returned route, passengers, pickup,
-currency and baggage. If the provider unexpectedly drops a positive bag
-count to **0**, either baggage type is normalized to the already-returned
-zero-bag quote with a concise exclusion warning rather than another GET.
-Other mismatches still fail closed. This maintains real price fidelity and
-avoids unwanted requests that may trigger 429.
-
-**Important unresolved operational question:** During the winter the API
-echoed **0 ordinary suitcases** even though 3 were sent together with
-3 ski bags; in the summer the same request echoed **0 ski bags**.
-This establishes the **public API basket** does not currently confirm both
-types together, **not** that the transfer driver would refuse to transport
-them. Laura must confirm whether both can physically travel together,
-capacity/extra charges, how to represent such a booking and whether the
-observed cutover dates are official and stable year to year.
-Do not represent the quoted price as including the unconfirmed baggage.
-No public checkout, affiliate link or payment action has been enabled.
-
-## Pending verification / questions for Laura
-
-1. Is the public quotes endpoint suitable for a commercial comparison site,
-   and are its prices identical to consumer checkout?
-2. Is displaying Alps2Alps next to competitors authorized?
-3. How is affiliate attribution for code `AIRPORTRIDEFINDER` preserved
-   in a vehicle-specific quote URL and actual customer booking?
-4. Do B2B transfer-request prices reflect customer-facing gross rates
-   or partner/net rates? Are there production fees, rate limits, or quotas?
-5. Are any caching, price validity or refresh requirements imposed?
-6. Which API (keyless public quotes or authenticated B2B v2) is supported
-   for a search-and-redirect rather than a booking-management workflow?
-7. Does the API have fixed season boundaries (observed Dec 1 and May 1),
-   and can guests bring both standard suitcases and ski/snowboard bags?
-   The current public API confirms only the seasonal baggage type even when
-   both counts are explicitly supplied; how should we quote/display these
-   journeys and any additional carriage charges?
-
-Do not send questions separately yet; collect further findings first.
-
-## Automated verification
-
-`src/test/alps2alps-sandbox.test.ts` uses an injected fake fetch only.
-CI performs no real API requests, so green CI tests establish code integrity,
-**not** successful authentication with the hosting-only Sandbox keys.
-Real authentication and price/vehicle shape must be confirmed from the
-password-protected hosted preview before claiming a live test has passed.
+Tests use mocked APIs: combined and zero winter bags, a changed supplier season,
+summer skis, all passenger/seat counts, unchanged prices/URLs, rejected links,
+quote expiry, race handling and HTTP 429 cooldown. CI runs the full unit suite,
+production build and TypeScript check. Passing these checks does not establish
+payment, partner-dashboard attribution or a completed transfer commission.

@@ -10,12 +10,37 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SearchRouteImport } from './routes/search'
+import { Route as AlpsPreviewRouteImport } from './routes/alps-preview'
+import { Route as GettransferPreviewRouteImport } from './routes/gettransfer-preview'
+import { Route as GettransferProductionPreviewRouteImport } from './routes/gettransfer-production-preview'
 import { Route as IntuiPreviewRouteImport } from './routes/intui-preview'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as TransferisePreviewRouteImport } from './routes/transferise-preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlpsPreviewRoute = AlpsPreviewRouteImport.update({
+  id: '/alps-preview',
+  path: '/alps-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GettransferPreviewRoute = GettransferPreviewRouteImport.update({
+  id: '/gettransfer-preview',
+  path: '/gettransfer-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GettransferProductionPreviewRoute =
+  GettransferProductionPreviewRouteImport.update({
+    id: '/gettransfer-production-preview',
+    path: '/gettransfer-production-preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const IntuiPreviewRoute = IntuiPreviewRouteImport.update({
+  id: '/intui-preview',
+  path: '/intui-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -23,40 +48,78 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IntuiPreviewRoute = IntuiPreviewRouteImport.update({
-  id: '/intui-preview',
-  path: '/intui-preview',
+const TransferisePreviewRoute = TransferisePreviewRouteImport.update({
+  id: '/transferise-preview',
+  path: '/transferise-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/search': typeof SearchRoute
+  '/alps-preview': typeof AlpsPreviewRoute
+  '/gettransfer-preview': typeof GettransferPreviewRoute
+  '/gettransfer-production-preview': typeof GettransferProductionPreviewRoute
   '/intui-preview': typeof IntuiPreviewRoute
+  '/search': typeof SearchRoute
+  '/transferise-preview': typeof TransferisePreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/search': typeof SearchRoute
+  '/alps-preview': typeof AlpsPreviewRoute
+  '/gettransfer-preview': typeof GettransferPreviewRoute
+  '/gettransfer-production-preview': typeof GettransferProductionPreviewRoute
   '/intui-preview': typeof IntuiPreviewRoute
+  '/search': typeof SearchRoute
+  '/transferise-preview': typeof TransferisePreviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/search': typeof SearchRoute
+  '/alps-preview': typeof AlpsPreviewRoute
+  '/gettransfer-preview': typeof GettransferPreviewRoute
+  '/gettransfer-production-preview': typeof GettransferProductionPreviewRoute
   '/intui-preview': typeof IntuiPreviewRoute
+  '/search': typeof SearchRoute
+  '/transferise-preview': typeof TransferisePreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/search' | '/intui-preview'
+  fullPaths:
+    | '/'
+    | '/alps-preview'
+    | '/gettransfer-preview'
+    | '/gettransfer-production-preview'
+    | '/intui-preview'
+    | '/search'
+    | '/transferise-preview'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/search' | '/intui-preview'
-  id: '__root__' | '/' | '/search' | '/intui-preview'
+  to:
+    | '/'
+    | '/alps-preview'
+    | '/gettransfer-preview'
+    | '/gettransfer-production-preview'
+    | '/intui-preview'
+    | '/search'
+    | '/transferise-preview'
+  id:
+    | '__root__'
+    | '/'
+    | '/alps-preview'
+    | '/gettransfer-preview'
+    | '/gettransfer-production-preview'
+    | '/intui-preview'
+    | '/search'
+    | '/transferise-preview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SearchRoute: typeof SearchRoute
+  AlpsPreviewRoute: typeof AlpsPreviewRoute
+  GettransferPreviewRoute: typeof GettransferPreviewRoute
+  GettransferProductionPreviewRoute: typeof GettransferProductionPreviewRoute
   IntuiPreviewRoute: typeof IntuiPreviewRoute
+  SearchRoute: typeof SearchRoute
+  TransferisePreviewRoute: typeof TransferisePreviewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,11 +131,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
+    '/alps-preview': {
+      id: '/alps-preview'
+      path: '/alps-preview'
+      fullPath: '/alps-preview'
+      preLoaderRoute: typeof AlpsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gettransfer-preview': {
+      id: '/gettransfer-preview'
+      path: '/gettransfer-preview'
+      fullPath: '/gettransfer-preview'
+      preLoaderRoute: typeof GettransferPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gettransfer-production-preview': {
+      id: '/gettransfer-production-preview'
+      path: '/gettransfer-production-preview'
+      fullPath: '/gettransfer-production-preview'
+      preLoaderRoute: typeof GettransferProductionPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/intui-preview': {
@@ -82,13 +159,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntuiPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transferise-preview': {
+      id: '/transferise-preview'
+      path: '/transferise-preview'
+      fullPath: '/transferise-preview'
+      preLoaderRoute: typeof TransferisePreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SearchRoute: SearchRoute,
+  AlpsPreviewRoute: AlpsPreviewRoute,
+  GettransferPreviewRoute: GettransferPreviewRoute,
+  GettransferProductionPreviewRoute: GettransferProductionPreviewRoute,
   IntuiPreviewRoute: IntuiPreviewRoute,
+  SearchRoute: SearchRoute,
+  TransferisePreviewRoute: TransferisePreviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
