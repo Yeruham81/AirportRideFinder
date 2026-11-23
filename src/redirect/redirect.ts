@@ -1,9 +1,19 @@
 import type { NormalizedTransferOffer } from "@/domain/types";
+import { ALPS_QUOTE_MAX_AGE_MS, isAlpsBookingUrl } from "@/providers/alps2alps/booking-link";
+
+export interface LiveReferralOffer {
+  source: "public_live";
+  providerId: "alps2alps";
+  actionable: boolean;
+  bookingUrl: string | null;
+  quotedAt: number;
+  expiresAt: number;
+}
 
 /**
  * Provider-independent booking-link resolution. Each provider may later use
  * temporary URLs, quote ids, signed links or affiliate parameters; the final
- * strategy is an open decision. Phase 1 never produces a real URL.
+ * strategy is provider-specific. Mock offers never produce a real URL.
  */
 export type BookingLinkResolution =
   | { kind: "demo"; providerId: string; message: string }
@@ -11,8 +21,17 @@ export type BookingLinkResolution =
   | { kind: "unavailable"; reason: string };
 
 export async function resolveBookingLink(
-  offer: NormalizedTransferOffer,
+  offer: NormalizedTransferOffer | LiveReferralOffer,
 ): Promise<BookingLinkResolution> {
+  if (offer.source === "public_live") {
+    if (!offer.actionable || !isAlpsBookingUrl(offer.bookingUrl))
+      return { kind: "unavailable", reason: "Supplier booking link unavailable." };
+    const now = Date.now();
+    if (!Number.isFinite(offer.quotedAt) || !Number.isFinite(offer.expiresAt) ||
+      offer.quotedAt > now || offer.expiresAt <= now || offer.expiresAt - offer.quotedAt > ALPS_QUOTE_MAX_AGE_MS)
+      return { kind: "unavailable", reason: "Refresh prices to continue booking." };
+    return { kind: "url", url: offer.bookingUrl, expiresAt: new Date(offer.expiresAt).toISOString() };
+  }
   if (offer.source === "mock" || !offer.actionable) {
     return {
       kind: "demo",

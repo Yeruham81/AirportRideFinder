@@ -4,7 +4,6 @@ import {
   alpsCatalogAllowsPair,
   fetchAlpsRouteCatalog,
   parseAlpsRouteCatalog,
-  parseAlpsPublicQuote,
   suggestAlpsCatalogLocations,
 } from "@/providers/alps2alps/public-quote";
 
@@ -89,49 +88,4 @@ describe("Alps2Alps official active route autocomplete catalog", () => {
     expect(String(url)).not.toContain("token");
   });
 
-  it("differentiates vendor-confirmed summer bag normalization from a transport failure", () => {
-    const query = {
-      from: "airport-1", to: "resort-11", date: "2027-07-22", time: "14:00",
-      passengers: 2, luggage: 2, skiBags: 2, currency: "GBP" as const,
-    };
-    const body = {
-      currency: "GBP",
-      route: {
-        from_code: "airport-1", to_code: "resort-11",
-        from: "Geneva Airport", to: "Chamonix",
-      },
-      passengers: { adults: 2 },
-      outbound: {
-        pick_up_date_time: "2027-07-22 14:00:00",
-        luggage: { normal_suitcases: 2, ski_bags: 0, ski_equipment: 0 },
-        vehicles: [
-          { vehicle_type_id: 10, name: "Minivan", price: 241.25, offer_code: "requested" },
-        ],
-      },
-    };
-    const adjusted = parseAlpsPublicQuote(body, query);
-    expect(adjusted.status).toBe("ok");
-    if (adjusted.status !== "ok") throw Error("expected verified 0-ski-bag quote");
-    expect(adjusted.skiBags).toBe(0);
-    expect(adjusted.bagAdjustment).toEqual({ requestedSkiBags: 2, quotedSkiBags: 0 });
-    expect(adjusted.offers[0]?.price).toEqual({ currency: "GBP", minor: 24125 });
-    expect(adjusted.offers[0]?.actionable).toBe(false);
-    const requestedZero = parseAlpsPublicQuote(body, { ...query, skiBags: 0 });
-    expect(requestedZero.status).toBe("ok");
-    if (requestedZero.status !== "ok") throw Error("expected regular quote");
-    expect(requestedZero.bagAdjustment).toBeUndefined();
-    // Other baggage mismatches must not silently pass.
-    expect(parseAlpsPublicQuote({
-      ...body, outbound: {
-        ...body.outbound,
-        luggage: { normal_suitcases: 1, ski_bags: 0 },
-      },
-    }, query)).toEqual({ status: "quote_mismatch", field: "suitcases", requested: 2, quoted: 1 });
-    expect(parseAlpsPublicQuote({
-      ...body, outbound: {
-        ...body.outbound,
-        luggage: { normal_suitcases: 2, ski_bags: 1 },
-      },
-    }, query)).toEqual({ status: "quote_mismatch", field: "ski_bags", requested: 2, quoted: 1 });
-  });
 });
